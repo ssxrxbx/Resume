@@ -29,7 +29,7 @@ flowchart LR
 | 1. 경험 정리 | `/exp-add` | 경험 1건 = 파일 1개 (STAR + 태그 + 증거 조각) | 새 경험이 생길 때 |
 | 2. 기업 분석 | `/company-analyze` | `jd.md` · `context.md` · `fit-matrix.md` | 회사마다 한 번 |
 | 3. 답안 작성 | `/answer` | `answers.md`에 문항별 답안 누적 | 문항마다 |
-| 자체 개선 | `/retro` | `IMPROVEMENTS.md`에 개선점 기록 | 가끔 / 자동 |
+| 자체 개선 | `/retro` | 채점 · 서류 결과 비교 · 회귀 테스트 → `IMPROVEMENTS.md` | 한 지원을 끝냈을 때 |
 
 ## 답안은 이렇게 만들어진다
 
@@ -58,6 +58,19 @@ flowchart LR
 
 - 끊을 때가 되면 에이전트가 먼저 제안합니다.
 - PDF·이미지 자료는 채팅창에 붙이지 말고 **파일 경로**로 알려 주세요. 텍스트로 바꿔 필요한 쪽만 읽습니다.
+
+## 낸 뒤에: 결과를 적으면 에이전트가 배운다
+
+각 `applications/회사명/answers.md` 첫머리에 세 줄을 적어 둡니다.
+
+```
+> 제출: 2026-09-15        (아직이면 미제출)
+> 결과: 서류 합격         (서류 불합격 · 대기)
+> 지원 유형: 인접 이동     (직무 정합 · 인접 이동 · 전환)
+```
+
+- **틀린 사실이 다시 나가지 않게**: 답안을 쓰다 사실을 바로잡으면 경험 원본까지 고칩니다. 바로 못 고치면 `_check.py`가 오류로 막습니다. 이미 낸 지원서에 틀린 표현이 있으면 고치지 않고 `## 면접 주의`에 적어 면접 때 대비합니다.
+- **결과로 검증**: `/retro`가 합격·불합격 지원을 나란히 놓고 비교합니다. 규칙을 크게 바꾸면 승인했던 답안을 새 규칙으로 다시 써 보고(회귀 테스트) 예전 실수가 되풀이되는지 봅니다.
 
 ## 핵심 원칙
 
@@ -94,7 +107,7 @@ for f in profile INDEX TAGS skills _history _terms; do cp portfolio/_templates/$
 cp portfolio/_templates/IMPROVEMENTS.md IMPROVEMENTS.md
 ```
 
-Claude Code에서 폴더를 열고 `/exp-add`로 경험부터 채웁니다. 업데이트는 `git pull` (개인 데이터는 덮어써지지 않음), 변경 내역은 [CHANGELOG](CHANGELOG.md).
+Claude Code에서 폴더를 열고 `/exp-add`로 경험부터 채웁니다(INDEX는 `_index.py`가 자동으로 만듭니다). 업데이트는 `git pull` (개인 데이터는 덮어써지지 않음), 변경 내역은 [CHANGELOG](CHANGELOG.md).
 
 ## 폴더
 
@@ -103,9 +116,10 @@ Claude Code에서 폴더를 열고 `/exp-add`로 경험부터 채웁니다. 업�
 AGENTS.md · .agents/            Codex용 사본              │ 공개
 portfolio/_*.py · _templates/   스크립트 · 템플릿(경험·회사 분석·session 등) ┘
 portfolio/career · activities · projects   경험 (car- / act- / prj-)   ┐
-portfolio/profile · INDEX · TAGS · skills  프로필 · 색인 · 태그 · 기술   │ 개인
+portfolio/profile · INDEX · TAGS · skills  프로필 · 색인(자동 생성) · 태그 · 기술 │ 개인
 portfolio/_history.md                      경험 정정 이력(재료 아님)   │
 portfolio/_terms.md                        답안 표현 사전(금지·내부 용어) │
+portfolio/.regress/                        회귀 테스트 결과              │
 companies/회사명/                           분석 · sources(추출 텍스트) │ (git 제외)
 applications/회사명/                        answers · session          │
 IMPROVEMENTS.md · -archive.md             개선 백로그 · 보관함        ┘
@@ -122,6 +136,8 @@ IMPROVEMENTS.md · -archive.md             개선 백로그 · 보관함        
 | 지원 유형 | 직무 정합 / 인접 이동 / 전환 — 지원마다 새로 판정 |
 | 전략 카드 | 쓰기 전에 확정하는 표: HR 판정 질문 · 포지셔닝 · 예상 반박 방어 |
 | 🔒 승인 문장 | 내가 OK한 문장. 이후 다시 고치지 않는다 |
+| 면접 주의 | 이미 낸 지원서에 들어간 틀린 표현과 실제 사실. 면접 대비용 |
+| 회귀 테스트 | 승인한 답안을 새 규칙으로 블라인드 재작성해 예전 실수가 재발하는지 보는 검사 |
 | session.md | 대화를 새로 열어도 이어가게 해 주는 인계 파일 |
 
 </details>
