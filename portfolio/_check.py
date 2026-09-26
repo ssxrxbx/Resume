@@ -258,6 +258,36 @@ for src, dst in MIRRORS:
     if os.path.exists(os.path.join(REPO, src)) and (not os.path.exists(d) or open(d, encoding='utf-8').read() != mirror_text(src)):
         err.append(f"[10] Codex 사본 불일치 {dst} — python3 portfolio/_check.py --sync")
 
+# 11. 지원서 사실 점검 — ①정정 미반영 ②제출본에 들어간 사실 오류(_terms.md 이유 칸이 🔴인 금지 표현)
+sys.path.insert(0, ROOT)
+import _lint
+FACT_BAN = [b for b in _lint.load_terms()[0] if b[3].startswith('🔴')]
+OPEN_FIX = re.compile(r'(원본|포트폴리오) 정정 필요|역류 필요')
+n_open = n_exp = 0
+for ap in sorted(glob.glob(os.path.join(REPO, 'applications', '*', 'answers.md'))):
+    co = ap.split(os.sep)[-2]
+    txt = open(ap, encoding='utf-8').read()
+    for k, line in enumerate(txt.split('\n'), 1):
+        if OPEN_FIX.search(line) and '✅' not in line and '확인 대기' not in line:
+            n_open += 1
+            err.append(f"[11] {co} answers.md:{k} 원본 정정 미반영 — portfolio/ 원본·_history.md에 반영하고 이 줄에 ✅ (사용자 확인 전이면 INDEX 「사실 확인 대기」로 옮기고 '→ 확인 대기')")
+    m = re.search(r'^>\s*제출:\s*(.+)$', '\n'.join(txt.split('\n')[:8]), re.M)
+    status = m.group(1).strip() if m else ''
+    if not m:
+        warn.append(f"[11] {co}: 제출 상태 표기 없음 — 파일 첫머리에 `> 제출: YYYY-MM-DD` 또는 `> 제출: 미제출` (모르면 제출로 본다)")
+    caution = next((s for s in re.split(r'^## ', txt, flags=re.M) if s.startswith('면접 주의')), '')
+    for b in _lint.answer_blocks(co):
+        for w, alt, why, s in _lint.ban_hits(b['body'], FACT_BAN):
+            if f'"{w}"' in caution:
+                continue
+            n_exp += 1
+            where = f"{co} 「{b['head'][:24]}」 \"{s[:30]}…\""
+            if status.startswith('미제출'):
+                warn.append(f"[11] {where} — 사실 오류 \"{w}\"(대신: {alt[:24]}). 제출 전 고친다")
+            else:
+                err.append(f"[11] {where} — 제출본에 사실 오류 \"{w}\". answers.md 끝 `## 면접 주의`에 `- \"{w}\" — 실제: …` 한 줄을 올린다(제출본은 고치지 않는다)")
+print(f"[11] 지원서 사실 점검 — 정정 미반영 {n_open} · 제출본 사실 오류 미기록 {n_exp}" + (" ✅" if not (n_open or n_exp) else ""))
+
 print()
 for w in warn:
     print("⚠️ ", w)

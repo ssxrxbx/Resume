@@ -35,6 +35,7 @@ COPY_MIN_SRC = 30       # 포트폴리오 원본과는 이 길이 이상 (서비
 LABEL_MIN = 20          # 제목·한 줄 요약·키 메시지(라벨성 문구)와는 이 길이 이상이면 경고
 FILL = 0.95             # 글자 수 목표: 제한의 95% 이상
 # 수치 근거: "숫자+단위"가 경험 파일·회사 분석에 없으면 ⚠️ (합산·외부 출처면 근거를 남기고 유지)
+UNSURE = re.compile(r"⚠️|미확인|미확정|추정|확인 필요|불확실")   # 이 표시가 있는 원본 줄 = 확정 전 사실
 NUM = re.compile(r"(\d+(?:[.,]\d+)*)\s*(%|퍼센트|배|건|명|개사|개|종|곳|팀|위|회|주|개월|년|시간|초|분|만|억|천)")
 
 
@@ -96,8 +97,9 @@ def portfolio_pool():
     return pool
 
 
-def source_corpus(company):
-    """수치 근거를 찾을 원천: 경험 파일·프로필·기술 + 그 회사 분석(이름이 겹치는 폴더 포함). _history는 제외."""
+def source_corpus(company, sure_only=False):
+    """수치 근거를 찾을 원천: 경험 파일·프로필·기술 + 그 회사 분석(이름이 겹치는 폴더 포함). _history는 제외.
+    sure_only: 확정 전 표시(UNSURE)가 있는 줄을 뺀 원천 — 미확인 사실 판정용."""
     fs = [f for f in ROOT.glob("**/*.md") if "_templates" not in f.parts and f.name != "_history.md"
           and f.name not in ("INDEX.md", "TAGS.md")]
     cdir = REPO / "companies"
@@ -105,7 +107,10 @@ def source_corpus(company):
         for d in cdir.iterdir():
             if d.is_dir() and (company.startswith(d.name) or d.name.startswith(company)):
                 fs += list(d.glob("**/*.md"))
-    return clean("\n".join(f.read_text(encoding="utf-8") for f in fs)).replace(",", "")
+    raw = "\n".join(f.read_text(encoding="utf-8") for f in fs)
+    if sure_only:
+        raw = "\n".join(l for l in raw.split("\n") if not UNSURE.search(l))
+    return clean(raw).replace(",", "")
 
 
 def load_terms():
@@ -124,10 +129,22 @@ def load_terms():
             continue
         if cur == "ban":
             ctx = [x.strip() for x in cells[1].split(",") if x.strip()] if len(cells) > 1 else []
-            ban.append((cells[0], ctx, cells[2] if len(cells) > 2 else ""))
+            ban.append((cells[0], ctx, cells[2] if len(cells) > 2 else "", cells[3] if len(cells) > 3 else ""))
         elif cur == "int":
             internal.append((cells[0], cells[1] if len(cells) > 1 else ""))
     return ban, internal
+
+
+def ban_hits(body, ban, skip=()):
+    """금지 표현이 쓰인 문장 → [(표현, 대신, 이유, 문장)]. 문맥 칸은 같은 문단에서 찾는다. skip = 검사 제외 문장(🔒)."""
+    out = []
+    paras = [p for p in re.split(r"\n\s*\n|\n(?=\S)", clean(body)) if p.strip()]
+    for w, ctx, alt, why in ban:
+        hit = next((s for p in paras for s in sentences(p)
+                    if w in s and s not in skip and (not ctx or any(c in p for c in ctx))), None)
+        if hit:
+            out.append((w, alt, why, hit))
+    return out
 
 
 def label_pool():
@@ -171,7 +188,7 @@ def parse_type(s):
     return m.group(1) if m else ("D" if "항목 기입" in s else None)
 
 
-def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=(), pool=None, label="", per_item=False, corpus=None, jd_terms=(), terms=((), ()), labels=(), cross=()):
+def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=(), pool=None, label="", per_item=False, corpus=None, jd_terms=(), terms=((), ()), labels=(), cross=(), sure=None):
     body = clean(body)
     title, text = split_title(body)
     sents = sentences(body)
@@ -261,13 +278,7 @@ def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=
     # 11. 답안 표현 사전 (portfolio/_terms.md) — 🔒 문장 제외
     ban, internal = terms
     js = [s for s in sents if not any(s in l or l in s for l in lk)]
-    hit_b = []
-    paras = [p for p in re.split(r"\n\s*\n|\n(?=\S)", text) if p.strip()]
-    for w, ctx, alt in ban:
-        for s in js:
-            if w in s and (not ctx or any(c in p for p in paras if s in p for c in ctx)):
-                hit_b.append(f"\"{w}\"" + (f" → {alt[:30]}" if alt else ""))
-                break
+    hit_b = [f"\"{w}\"" + (f" → {alt[:30]}" if alt else "") for w, alt, _, _ in ban_hits(body, ban, set(sents) - set(js))]
     (E if hit_b else OK).append("금지 표현(_terms.md): " + "; ".join(hit_b) if hit_b else "금지 표현(_terms.md) 없음")
     hit_i = [f"{w} → {alt}" for w, alt in internal
              if any(re.search(rf"{re.escape(w)}(?!\s*\()", s) for s in js) and not any(w in k for k in kw)]
@@ -289,6 +300,11 @@ def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=
                        if not re.search(rf"(?<![\d.]){re.escape(m.group(1).replace(',', ''))}\s*{re.escape(m.group(2))}", corpus)})
         (W if miss else OK).append("수치 근거 확인" if not miss else
             f"원본에 없는 수치 {len(miss)}개 — {', '.join(miss[:6])} (합산·외부 출처면 근거를 사용 경험 ID에 남기고, 아니면 원본 수치로 고친다)")
+        if sure is not None:
+            unsure = sorted({m.group(0) for m in NUM.finditer(judged_text) if m.group(0) not in miss
+                             and not re.search(rf"(?<![\d.]){re.escape(m.group(1).replace(',', ''))}\s*{re.escape(m.group(2))}", sure)})
+            if unsure:
+                W.append(f"미확인 수치 {len(unsure)}개 — {', '.join(unsure[:6])} (원본에서 ⚠️·추정·미확인 표시 줄에만 있다. 제출 전 사용자 확인)")
 
     typ = qtype or "?"
     print(f"■ {label} ({limit or '제한 없음'}{'자' if limit else ''}, {typ}형) — 공백 포함 {n_sp} / 제외 {n_ns}")
@@ -323,6 +339,17 @@ def answer_blocks(company):
         out.append(dict(head=head.strip(), body=m.group(1), limit=limit, no_space=ns, per_item=per_item,
                         qtype=parse_type(tm.group(1)) if tm else parse_type(head)))
     return out
+
+
+def unparsed(company):
+    """`## Q…` 문항인데 `### 답안`이 없고, 「(검사용 최종본)」 사본도 없는 섹션 제목."""
+    p = REPO / "applications" / company / "answers.md"
+    if not p.exists():
+        return []
+    secs = [(b.split("\n")[0].strip(), bool(re.search(r"^### 답안", b, re.M)))
+            for b in re.split(r"^## ", p.read_text(encoding="utf-8"), flags=re.M)[1:]]
+    done = [h.replace("(검사용 최종본)", "").strip() for h, ok in secs if ok]
+    return [h for h, ok in secs if not ok and re.match(r"^Q\d*[.\s]", h) and not any(d.startswith(h[:20]) for d in done)]
 
 
 def from_session(company):
@@ -383,7 +410,7 @@ def main(argv):
     opt = lambda k: args[args.index(k) + 1] if k in args else None
     kw = [k.strip() for k in (opt("--kw") or "").split(",") if k.strip()]
     pool = portfolio_pool()
-    corpus = source_corpus(company)
+    corpus, sure = source_corpus(company), source_corpus(company, sure_only=True)
     terms, labels, cross = load_terms(), label_pool(), other_company_pool(company)
     blocks = answer_blocks(company)
     jd_terms = [k for k in kw if "·" in k]
@@ -403,19 +430,22 @@ def main(argv):
             return 0
         for b in blocks:
             errs += lint(b["body"], b["limit"], b["no_space"], b["qtype"], others=others_of(b["body"]),
-                         kw=kw, pool=pool, label=b["head"][:48], per_item=b["per_item"], corpus=corpus, jd_terms=jd_terms, terms=terms, labels=labels, cross=cross)
+                         kw=kw, pool=pool, label=b["head"][:48], per_item=b["per_item"], corpus=corpus, jd_terms=jd_terms, terms=terms, labels=labels, cross=cross, sure=sure)
         print(f"■ {company} {len(blocks)}문항 — ❌ 합계 {errs}")
+        miss = unparsed(company)
+        if miss:
+            print(f"⚠️  검사 못 한 문항 {len(miss)}개 (`### 답안` 없음 — 구 포맷이면 파일 끝에 「검사용 최종본」으로 옮긴다): " + " / ".join(m[:30] for m in miss))
     elif opt("--file"):
         body = Path(opt("--file")).read_text(encoding="utf-8")
         errs = lint(body, int(opt("--limit")) if opt("--limit") else None, "--no-space" in args,
-                    opt("--type"), others=others_of(body), kw=kw, pool=pool, label=f"{company} {opt('--file')}", corpus=corpus, jd_terms=jd_terms, terms=terms, labels=labels, cross=cross)
+                    opt("--type"), others=others_of(body), kw=kw, pool=pool, label=f"{company} {opt('--file')}", corpus=corpus, jd_terms=jd_terms, terms=terms, labels=labels, cross=cross, sure=sure)
     else:
         s = from_session(company)
         if not s["body"]:
             print("❌ session.md 「현재 초안」이 비어 있다")
             return 1
         errs = lint(s["body"], s["limit"], s["no_space"], s["qtype"], locked=s["locked"],
-                    others=others_of(s["body"]), kw=kw, pool=pool, label=s["head"], corpus=corpus, jd_terms=jd_terms, terms=terms, labels=labels, cross=cross)
+                    others=others_of(s["body"]), kw=kw, pool=pool, label=s["head"], corpus=corpus, jd_terms=jd_terms, terms=terms, labels=labels, cross=cross, sure=sure)
     return 1 if errs else 0
 
 

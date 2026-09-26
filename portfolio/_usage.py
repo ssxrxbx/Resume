@@ -185,7 +185,25 @@ def by_experience(eid):
                 print(f"    {l[:180]}")
             n += 1
     print(f"→ {eid}: {n}문항에서 사용")
+    unsure_facts(eid)
     return 0
+
+
+UNSURE = re.compile(r"⚠️|미확인|미확정|추정|확인 필요|불확실")
+
+
+def unsure_facts(eid):
+    """그 경험 파일에서 확정 전 표시가 있는 줄 — 답안에 단정문으로 쓰지 않는다(제출 전 사용자 확인)."""
+    src = next((p for p in ROOT.glob("*/*.md") if "_templates" not in p.parts
+                and re.search(rf"^id:\s*{re.escape(eid)}\s*$", p.read_text(encoding="utf-8"), re.M)), None)
+    if not src:
+        return
+    body = src.read_text(encoding="utf-8").split("---", 2)[-1]
+    rows = [l.strip() for l in body.split("\n") if UNSURE.search(l) and not l.lstrip("> ").startswith("⛔")]
+    if rows:
+        print(f"\n⚠️  {eid} 미확인 사실 {len(rows)}줄 — 답안에 쓰면 단정하지 말고 제출 전 사용자에게 확인한다:")
+        for l in rows[:8]:
+            print(f"    {l[:160]}")
 
 
 if __name__ == "__main__":

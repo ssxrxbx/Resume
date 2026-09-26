@@ -32,7 +32,7 @@ API 호출마다 대화 전체가 다시 전송되므로 **세션 길이가 비�
 - 인계 파일 `applications/{회사명}/session.md`(형식: `portfolio/_templates/session.md`)는 **현재 상태만** 담는다: 분석 요약(답안 세션의 회사 입력, 원본은 `companies/`)·문항 상태표·배분·이번 지원 전용 지시 / 진행 중 문항의 확정 전략 카드·뼈대·🔒 승인 문장·최신 초안·열린 결정.
 - 새 세션은 session.md부터 읽는다. 없는 맥락은 추측하지 말고 묻는다. 🔒 승인 문장은 사용자가 고치라고 할 때만 바꾼다.
 - 답안 기계 검사는 `python3 portfolio/_lint.py {회사명}`(고친 뒤 재확인까지 최대 2회). PDF·이미지는 `python3 portfolio/_extract.py <파일> {회사명}`으로 텍스트화해 필요한 쪽만 읽는다. 즉석 검사 스크립트·도구 탐색을 하지 않는다.
-- 피드백 저장 위치: 이번 지원에만 → session.md / "앞으로도" → 스킬·메모리 / 사실 정정 → `portfolio/` 원본.
+- 피드백 저장 위치: 이번 지원에만 → session.md / "앞으로도" → 스킬(지원자 개인 기준은 `profile.md`, 메모리엔 대화 방식만) / 사실 정정 → `portfolio/` 원본.
 
 ## 스킬
 `/exp-add` 경험 정리(1) · `/company-analyze` 기업 분석(2) · `/answer` 답안(3) · `/retro` 자체 평가·개선
