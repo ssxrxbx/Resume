@@ -262,9 +262,10 @@ def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=
     ban, internal = terms
     js = [s for s in sents if not any(s in l or l in s for l in lk)]
     hit_b = []
+    paras = [p for p in re.split(r"\n\s*\n|\n(?=\S)", text) if p.strip()]
     for w, ctx, alt in ban:
         for s in js:
-            if w in s and (not ctx or any(c in s for c in ctx)):
+            if w in s and (not ctx or any(c in p for p in paras if s in p for c in ctx)):
                 hit_b.append(f"\"{w}\"" + (f" → {alt[:30]}" if alt else ""))
                 break
     (E if hit_b else OK).append("금지 표현(_terms.md): " + "; ".join(hit_b) if hit_b else "금지 표현(_terms.md) 없음")
