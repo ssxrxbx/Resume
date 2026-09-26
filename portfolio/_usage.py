@@ -17,11 +17,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
 ID = r"(?:car|act|prj)-\d+"
+META = {}   # id → type·tags·정량·재료·한 줄 요약 (로스터 출력용)
 
 
 def load_roster():
     """경험 파일 frontmatter에서 전체 로스터와 계열(container+하위)을 만든다."""
     roster, projects_of, parent_of = {}, {}, {}
+    META.clear()
     for f in sorted(ROOT.rglob("*.md")):
         if "_templates" in f.parts:      # 템플릿(car-00 등)은 로스터가 아니다
             continue
@@ -32,6 +34,13 @@ def load_roster():
         eid = m.group(1)
         t = re.search(r'^title:\s*"?(.*?)"?\s*$', head, re.M)
         roster[eid] = (t.group(1) if t else f.stem)[:44]
+        g = lambda k: (re.search(rf"^{k}:\s*(.*?)(?:\s+#.*)?$", head, re.M) or [None, ""])[1]
+        body = f.read_text(encoding="utf-8").split("---", 2)[-1]
+        s = re.search(r"^## 한 줄 요약\n+(?!#)(.+)$", body, re.M)
+        META[eid] = dict(type=g("type")[:1] or "?", tags=re.sub(r"[\[\]\s]", "", g("tags")),
+                         quant="✅" if g("quant").startswith("true") else "△",
+                         ready="✅" if g("material_ready").startswith("true") else "✗",
+                         summary=re.sub(r"\*\*|`", "", s.group(1)).strip()[:60] if s else "")
         p = re.search(r"^projects:\s*\[(.*?)\]", head, re.M)
         if p:
             kids = re.findall(ID, p.group(1))
@@ -76,13 +85,24 @@ def ids_in_block(block):
     return set(re.findall(ID, body)), True
 
 
+def print_roster(roster, per_id, parent_of):
+    """후보 스캔용 전체 로스터 — INDEX.md 전체를 읽지 않아도 되게 한 줄씩(frontmatter 기준이라 항상 최신)."""
+    print(f"\n[로스터] {len(roster)}건 — ID 유형(e/c) 재료/정량 · 이 회사 사용 · 제목 — 한 줄 요약 · 태그")
+    for i in sorted(roster, key=lambda x: (x[:3] != "car", x[:3] != "act", x)):
+        m = META.get(i, {})
+        up = f" ↑{parent_of[i]}" if i in parent_of else ""
+        used = f"{per_id[i]}회" if per_id.get(i) else "·"
+        print(f"  {i} {m.get('type','?')} {m.get('ready','?')}/{m.get('quant','?')} {used:>3}{up}  {roster[i]} — {m.get('summary','')} · {m.get('tags','')}")
+
+
 def main(company):
     path = REPO / "applications" / company / "answers.md"
+    roster, projects_of, parent_of = load_roster()
     if not path.exists():
         print(f"■ {company} — 저장된 답안 없음(첫 문항). 편중 집계는 건너뛴다.")
+        print_roster(roster, {}, parent_of)
         return 0
     text = path.read_text(encoding="utf-8")
-    roster, projects_of, parent_of = load_roster()
 
     blocks = parse_blocks(text)
     per_id, per_line, missing = Counter(), Counter(), []
@@ -130,8 +150,8 @@ def main(company):
               f"쓸 경험이 정해져 있어 편중 판정 대상이 아니다)")
 
     unused = [i for i in roster if i not in per_id]
-    print(f"\n미사용 {len(unused)}/{len(roster)}건:")
-    for i in sorted(unused):
+    print_roster(roster, per_id, parent_of)
+    for i in []:
         print(f"   {i}  {roster[i]}")
     if len(unused) > len(roster) / 2:
         print(f"⚠️  로스터의 절반 이상({len(unused)}/{len(roster)})이 미사용 — 게이트에 보고할 것")
