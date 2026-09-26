@@ -69,6 +69,7 @@ AGENTS.md, .agents/       Codex용 미러
 portfolio/
   _check.py               정합성 검사 (python3 portfolio/_check.py)
   _usage.py               회사별 경험 사용 이력·편중 집계
+  _lint.py                답안 문체·형식 검사 (python3 portfolio/_lint.py {회사})
   _templates/             경험·INDEX·TAGS·profile·session 템플릿
   career/      car-*      경력              ┐
   activities/  act-*      대외활동           │

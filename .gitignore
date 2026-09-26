@@ -12,6 +12,7 @@ __pycache__/
 portfolio/*
 !portfolio/_check.py
 !portfolio/_usage.py
+!portfolio/_lint.py
 !portfolio/_templates/
 !portfolio/career/
 !portfolio/activities/
