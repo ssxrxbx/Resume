@@ -1,0 +1,27 @@
+.DS_Store
+**/.DS_Store
+
+# Claude Code 로컬 전용 설정 (공유 대상 아님)
+.claude/settings.local.json
+
+__pycache__/
+*.pyc
+
+# ── 개인 데이터: 로컬 전용. 공개 저장소에 올리지 않는다 ──
+# 에이전트 구조(규칙·스킬·스크립트·템플릿)만 버전 관리한다.
+portfolio/*
+!portfolio/_check.py
+!portfolio/_usage.py
+!portfolio/_templates/
+!portfolio/career/
+!portfolio/activities/
+!portfolio/projects/
+portfolio/career/*
+portfolio/activities/*
+portfolio/projects/*
+!portfolio/*/.gitkeep
+companies/*
+!companies/.gitkeep
+applications/*
+!applications/.gitkeep
+IMPROVEMENTS.md
