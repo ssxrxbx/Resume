@@ -38,6 +38,19 @@ git pull
 
 개인 데이터는 추적되지 않으므로 `git pull`로 덮어써지지 않는다. 버전은 태그(`v1.0.0` 등)로 관리한다.
 
+## 세션 운영 (토큰 절약)
+
+API 호출마다 대화 전체가 다시 전송되므로 **세션을 작업 단위로 끊는 게** 토큰을 가장 크게 줄인다
+(과거 30세션 재생 시뮬레이션: 전체 -28%, 긴 세션 최대 -65%).
+
+1. `/company-analyze {회사}` → 분석 저장 후 **새 세션**
+2. `/answer {회사} 이어서` → 문항 1개 승인·저장 후 **새 세션**
+3. 다음 문항도 `/answer {회사} 이어서`
+
+세션 사이 상태는 `applications/{회사}/session.md`(인계 파일)가 넘긴다 —
+문항 상태표, 이번 지원 전용 지시, 확정된 전략 카드·뼈대, 🔒 승인 문장, 최신 초안.
+경계에 도달하면 에이전트가 먼저 새 세션을 제안한다.
+
 ## 사용법 (슬래시 커맨드)
 
 ```
@@ -56,13 +69,13 @@ AGENTS.md, .agents/       Codex용 미러
 portfolio/
   _check.py               정합성 검사 (python3 portfolio/_check.py)
   _usage.py               회사별 경험 사용 이력·편중 집계
-  _templates/             경험·INDEX·TAGS·profile 템플릿
+  _templates/             경험·INDEX·TAGS·profile·session 템플릿
   career/      car-*      경력              ┐
   activities/  act-*      대외활동           │
   projects/    prj-*      프로젝트           │ 개인 데이터
   profile.md · INDEX.md · TAGS.md          │ (로컬 전용,
 companies/{회사명}/        jd · context · fit-matrix │  git 제외)
-applications/{회사명}/     answers.md        │
+applications/{회사명}/     answers · session │
 IMPROVEMENTS.md           개선 로그          ┘
 ```
 
