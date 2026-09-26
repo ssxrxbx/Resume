@@ -2,6 +2,16 @@
 
 버전 규칙: 규칙·스킬 동작이 바뀌면 minor(v1.x.0), 문구·오탈자만 고치면 patch(v1.0.x).
 
+## v1.3.0 — 2026-09-26
+PDF·이미지 텍스트 추출 도구 (이미지를 대화에 쌓지 않기).
+
+- **`portfolio/_extract.py` 신설** (+ macOS 백엔드 `_extract.swift`): PDF·이미지를 `companies/{회사}/sources/{파일명}.md`로 텍스트화하고 목차만 출력. `--find`로 키워드 쪽 찾기, `--page`로 필요한 쪽만 읽기. 한 번 추출하면 재사용.
+- **3단 방식 자동 선택**: ① macOS PDFKit 텍스트 층 + Vision OCR(한국어·영어, 설치 불필요) → ② pypdf + Tesseract(kor) + pdftoppm/pypdfium2 → ③ 하위 에이전트 전사 지시문 출력.
+- `/company-analyze` 0단계·`/answer` 입력·CLAUDE.md: PDF·이미지는 Read로 직접 보지 않고 `_extract.py` 먼저. 도구 탐색 금지. 인용할 수치·필수 요건은 원본 쪽으로 확인.
+- README에 흐름도·운영체제별 안내·채팅 이미지 주의 추가.
+- 근거: 과거 이미지 PDF 세션에서 페이지 이미지 25장이 그 세션 토큰의 약 30%(재전송 약 2,600만 토큰), PDF 관련 명령 20건 대부분이 매 세션 반복된 도구 탐색.
+- 확인된 한계: Windows·Linux에서 도구가 하나도 없으면 이미지 PDF는 Read도 poppler가 필요하다(사진 파일은 바로 가능).
+
 ## v1.2.1 — 2026-09-26
 README 전면 개편 (문서만 변경, 동작 변화 없음).
 
