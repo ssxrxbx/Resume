@@ -72,6 +72,7 @@ def load():
             has_star=bool(re.search(r'^## S — 상황', t, re.M)),
             projects=re.findall(r'prj-\d+', g('projects')),
             heads=re.findall(r'^## (.+)$', t, re.M),
+            hist=(re.findall(r'\d{4}-\d{2}-\d{2}', t) + re.findall(r'^## .*(?:정정|역류|이력).*$', t, re.M))[:2],
         )
     return exps
 
@@ -85,7 +86,7 @@ print(f"경험 {len(E)}건 (container {sum(1 for v in E.values() if v['type']=='
 
 # 1. INDEX 행 수 == 파일 수
 n_rows = len(re.findall(r'^\| (?:car|act|prj)-\d+ \|', idx, re.M))
-(err if n_rows != len(E) else print)(
+(err.append if n_rows != len(E) else print)(
     f"[1] INDEX 행 수 불일치: 파일 {len(E)} vs INDEX {n_rows}" if n_rows != len(E)
     else f"[1] INDEX 행 수 == 파일 수 ({len(E)}) ✅")
 
@@ -138,6 +139,12 @@ for i, v in E.items():
         warn.append(f"[5] {i}: container인데 STAR 본문 있음 (episode가 맞는지 확인)")
     if v['type'] == 'episode' and not v['has_star']:
         err.append(f"[5] {i}: episode인데 STAR 본문 없음 (container이거나 미작성)")
+    if v['type'] == 'container':
+        miss = [h for h in ('개요', '구성', '전체 성과') if not any(x.split(' (')[0] == h for x in v['heads'])]
+        if miss:
+            err.append(f"[5] {i}: container 섹션 누락 — {', '.join(miss)} (이름 고정: 개요 / 구성 (하위 프로젝트) / 전체 성과)")
+    if v['hist']:
+        err.append(f"[5] {i}: 정정 경위가 파일에 있음 — {v['hist']} → portfolio/_history.md로 옮기고 현재 사실만 남길 것")
     if v['type'] not in ('episode', 'container'):
         err.append(f"[5] {i}: type이 episode/container가 아님 → '{v['type']}'")
 if not any(x.startswith('[5]') for x in err + warn):

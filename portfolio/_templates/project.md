@@ -5,7 +5,8 @@ type: episode          # 단일 STAR로 말할 수 있는 경험. 하위 프로�
 title: ""
 period: "YYYY ~ YYYY"
 role: ""
-activity: ""          # 소속 활동 ID (예: act-01). 단독이면 비움
+activity: ""          # 소속 활동 ID (예: act-01). 활동 산하가 아니면 비움
+career: ""            # 소속 경력 ID (예: car-01). 경력 산하 프로젝트면 activity 대신 이것
 context: ""           # 활동이 아닌 맥락(수업·산학 등)이 있으면 기재
 related: []           # 기타 연결 (prj-/act-/car-)
 tags: []              # 역량 태그 (매칭용)

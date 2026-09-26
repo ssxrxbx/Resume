@@ -12,9 +12,10 @@
 
 ## 경험 구조 (1단계)
 - `career/ car-*` 경력 · `activities/ act-*` 대외활동 · `projects/ prj-*` 산출물. **경험 1건 = 파일 1개**.
-- 연결: 프로젝트 `activity:` ↔ 활동 `projects:[]`, 그 외 `related:[]`. 항상 양방향.
+- 연결: 활동 산하 프로젝트는 `activity: act-NN`, 경력 산하 프로젝트는 `career: car-NN` ↔ 상위의 `projects:[]`. 그 외 `related:[]`. 항상 양방향.
 - frontmatter 필수: `id`, `category`, `type`.
 - `type`은 "이 경험 자체를 하나의 STAR로 말할 수 있는가"로 가른다. `episode` = S/T/A/R. `container` = 하위 프로젝트를 거느린 기간·소속으로 개요/구성/전체 성과, **STAR가 없는 게 정상**. `material_ready`도 유형별로 판정한다.
+- **경험 파일엔 현재 사실만 둔다.** 정정·보강 경위(날짜, 예전 기록)는 `portfolio/_history.md`에 쌓는다 — 옛 기록이 섞여 있으면 삭제한 거짓이 다시 재료로 쓰인다. 부정형 사용 제한(⛔ "수상 아님")은 파일에 남긴다.
 - 모든 파일에 `## 증거 조각`(`[표준태그] 사실 한 줄`, 3~8개). 본문의 파생물이라 함께 갱신한다. 3단계는 여기서 골라 조립한다.
 - 가져올 단위는 문항이 정한다(사건 = project, 기간 전체·성장 = container, 대부분 서술형 = container 배경 + project 본론). 나열 판정에선 container+하위를 1개로, 편중 집계에선 계열 단위로 센다.
 

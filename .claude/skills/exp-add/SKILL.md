@@ -19,16 +19,23 @@ description: 경험을 STAR + 역량 태그 구조로 포트폴리오에 추가�
    | 정의 | 단일 사건·서사 | 여러 산출물을 거느린 기간·소속 |
    | 본문 | S / T / A / R | 개요 / 구성(하위 링크) / 전체 성과 |
    | 예 | 프로젝트 1건, 단기 연수 | 다년 경력, 하위 프로젝트가 실질 산출물인 동아리 |
+   | 섹션 | `## S — 상황` 등 4개 | `## 개요` / `## 구성 (하위 프로젝트)` / `## 전체 성과` (이름 고정, `_check.py`가 검사) |
 
    하위 프로젝트가 있어도 활동 자체에 단일 서사가 있으면 episode(하위는 링크만). **container에 STAR를 억지로 만들지 않는다** — 여러 사건을 한 STAR로 압축하면 전부 뭉개진다.
 3. `portfolio/_templates/`로 `{prefix}-NN-{영문슬러그}.md`를 만든다(episode = career/activity/project.md, container = container.md).
 4. 본문을 채운다. 빈 요소·정량은 되묻는다(지어내지 않는다). R은 숫자·비율·규모·순위로, 없으면 `quant: false` + "정량 보강 필요".
 5. `tags`는 `TAGS.md` 표준 어휘에서만 고른다. 새 태그가 꼭 필요하면 TAGS.md에 먼저 정의한다. 의미가 겹치면 가장 가까운 표준 태그를 쓴다(예: '업무효율화' → `자동화`).
 6. `## 증거 조각`을 쓴다(아래 규칙).
-7. 연결: 프로젝트 `activity:` ↔ 활동 `projects:[]`, 그 외 양쪽 `related:[]`. container는 `## 구성`에도 링크한다.
+7. 연결: 활동 산하 프로젝트는 `activity: act-NN`, 경력 산하 프로젝트는 `career: car-NN` ↔ 상위의 `projects:[]`. 그 외 양쪽 `related:[]`. container는 `## 구성`에도 링크한다.
 8. frontmatter `id·category·type·material_ready·quant`를 실제 상태로. `material_ready`는 episode = STAR+조각, container = 개요+하위 연결+조각이다. STAR가 없다고 container를 `false`로 두지 않는다(3단계가 "보강 필요"로 오판한다).
 9. 새 기술·툴·자격이 나오면 `portfolio/skills.md`에 숙련도와 근거 ID를 반영한다(`/company-analyze`가 JD 기술 요건을 여기서 대조한다).
 10. INDEX를 재생성한다(아래 규칙). Notion 미러가 설정돼 있으면 반영한다.
+
+## 정정·보강 규칙 (`/answer` 중 원본 역류 포함)
+- 파일은 **정정된 현재 사실로 바로 고쳐 쓴다.** 괄호 메모·「정정 이력」 섹션을 붙이지 않는다.
+- 경위(날짜, 예전 기록, 발견 계기)는 `portfolio/_history.md`의 해당 ID 아래에 적는다. 이 파일은 재료가 아니다.
+- 다시 부풀려질 위험이 있는 사실은 부정형 한 줄로 남긴다(⛔ "수상 아님", "실험을 직접 설계하지 않았다").
+- 본문을 고치면 증거 조각·frontmatter·INDEX까지 함께 맞춘다(아래 규칙).
 
 ## 증거 조각 규칙
 본문은 서사라 답안에 그대로 못 쓴다. 조각은 거기서 꺼내 쓸 사실만 원자 단위로 분해한 목록이다 — 같은 경험이 문항마다 다른 사실로 흔들리는 걸 막는다.

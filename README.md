@@ -102,6 +102,7 @@ AGENTS.md · .agents/            Codex용 사본              │ 공개
 portfolio/_*.py · _templates/   스크립트 · 템플릿         ┘
 portfolio/career · activities · projects   경험 (car- / act- / prj-)   ┐
 portfolio/profile · INDEX · TAGS · skills  프로필 · 색인 · 태그 · 기술   │ 개인
+portfolio/_history.md                      경험 정정 이력(재료 아님)   │
 companies/회사명/                           분석 · sources(추출 텍스트) │ (git 제외)
 applications/회사명/                        answers · session          │
 IMPROVEMENTS.md                            개선 로그                  ┘
