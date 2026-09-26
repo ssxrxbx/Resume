@@ -4,7 +4,7 @@
 사용:  python3 portfolio/_usage.py <회사명>
 예:    python3 portfolio/_usage.py 회사명
 
-`/answer` 2단계 (a0/a0-2)의 필수 선행 단계. 인라인 스크립트를 쓰지 않는 이유:
+`/answer` 「2. 후보 스캔」의 선행 단계. `--exp prj-08`: 모든 회사 답안에서 그 경험을 쓴 문장만(프레이밍 일관성 확인). 인라인 스크립트를 쓰지 않는 이유:
 아카이브 포맷이 회사마다 조금씩 달라(`### 사용 경험 ID` 헤딩 / `**사용 경험 ID**:` 볼드,
 `[car-01](링크)` / `**car-01**` 표기) 정규식 하나로는 조용히 0건을 리턴한다.
 편중 경보가 "미사용"으로 오작동하면 편중을 못 잡으므로, 포맷 관용적으로 파싱한다.
@@ -79,8 +79,8 @@ def ids_in_block(block):
 def main(company):
     path = REPO / "applications" / company / "answers.md"
     if not path.exists():
-        print(f"❌ 없음: {path}")
-        return 1
+        print(f"■ {company} — 저장된 답안 없음(첫 문항). 편중 집계는 건너뛴다.")
+        return 0
     text = path.read_text(encoding="utf-8")
     roster, projects_of, parent_of = load_roster()
 
@@ -138,7 +138,27 @@ def main(company):
     return 0
 
 
+def by_experience(eid):
+    """모든 회사 answers.md에서 eid를 근거로 쓴 줄(「사용 경험 ID」)만 모은다 — 답안 전문을 읽지 않고 프레이밍을 대조."""
+    n = 0
+    for f in sorted((REPO / "applications").glob("*/answers.md")):
+        for b in parse_blocks(f.read_text(encoding="utf-8")):
+            ids, _ = ids_in_block(b)
+            if eid not in ids:
+                continue
+            title = b.split("\n")[0].lstrip("# ").strip()[:40]
+            lines = [l.strip() for l in b.split("\n") if eid in l and l.strip().startswith(("-", "|", "*"))][:2]
+            print(f"■ {f.parent.name} · {title}")
+            for l in lines:
+                print(f"    {l[:180]}")
+            n += 1
+    print(f"→ {eid}: {n}문항에서 사용")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--exp" in sys.argv:
+        sys.exit(by_experience(sys.argv[sys.argv.index("--exp") + 1]))
     if len(sys.argv) < 2:
         print(__doc__)
         cs = sorted(p.name for p in (REPO / "applications").iterdir() if p.is_dir())

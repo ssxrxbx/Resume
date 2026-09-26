@@ -80,7 +80,7 @@ flowchart LR
 | `python3 portfolio/_check.py` | 경험 파일 ↔ INDEX 정합성 + 규칙 파일 분량 예산 검사 (오류 0이 기준, `--sync`로 Codex 사본 갱신) |
 | `python3 portfolio/_usage.py 회사명` | 그 회사 답안에서 경험이 한쪽에 쏠렸는지 집계 |
 | `python3 portfolio/_lint.py 회사명` | 초안의 글자 수·문장 길이·금지 표현·🔒 보존·복붙·**원본에 없는 수치** 검사 (`--coverage`: 지원서 전체 JD 키워드 커버리지) |
-| `python3 portfolio/_extract.py 파일 회사명` | PDF·이미지 → 텍스트 파일 + 목차 (`--find`, `--page`) |
+| `python3 portfolio/_extract.py 파일 회사명` | PDF·이미지 → 텍스트 파일 + 목차 (`--find`, `--page`). 이력서 임포트는 회사명 대신 `_portfolio` |
 
 `_extract.py`는 macOS에선 설치 없이 OCR까지 됩니다. Windows·Linux는 `pip install pypdf pypdfium2` + Tesseract(한국어)를 권장하고, 없으면 하위 에이전트가 대신 읽습니다.
 
@@ -88,7 +88,7 @@ flowchart LR
 
 ```bash
 git clone https://github.com/ssxrxbx/Resume.git && cd Resume
-for f in profile INDEX TAGS skills; do cp portfolio/_templates/$f.md portfolio/$f.md; done
+for f in profile INDEX TAGS skills _history; do cp portfolio/_templates/$f.md portfolio/$f.md; done
 cp portfolio/_templates/IMPROVEMENTS.md IMPROVEMENTS.md
 ```
 
@@ -99,13 +99,13 @@ Claude Code에서 폴더를 열고 `/exp-add`로 경험부터 채웁니다. 업�
 ```
 .claude/CLAUDE.md · skills/     규칙 · 스킬 4종          ┐
 AGENTS.md · .agents/            Codex용 사본              │ 공개
-portfolio/_*.py · _templates/   스크립트 · 템플릿         ┘
+portfolio/_*.py · _templates/   스크립트 · 템플릿(경험·회사 분석·session 등) ┘
 portfolio/career · activities · projects   경험 (car- / act- / prj-)   ┐
 portfolio/profile · INDEX · TAGS · skills  프로필 · 색인 · 태그 · 기술   │ 개인
 portfolio/_history.md                      경험 정정 이력(재료 아님)   │
 companies/회사명/                           분석 · sources(추출 텍스트) │ (git 제외)
 applications/회사명/                        answers · session          │
-IMPROVEMENTS.md                            개선 로그                  ┘
+IMPROVEMENTS.md · -archive.md             개선 백로그 · 보관함        ┘
 ```
 
 <details>

@@ -27,4 +27,5 @@ companies/*
 !companies/.gitkeep
 applications/*
 !applications/.gitkeep
-IMPROVEMENTS.md
+/IMPROVEMENTS.md
+/IMPROVEMENTS-archive.md

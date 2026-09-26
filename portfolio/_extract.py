@@ -4,6 +4,7 @@
     python3 portfolio/_extract.py <파일> <회사명>            # 추출 → companies/<회사명>/sources/<파일명>.md, 목차 출력
     python3 portfolio/_extract.py <파일> <회사명> --find "IT 인프라,네트워크"   # 키워드가 있는 페이지만
     python3 portfolio/_extract.py <파일> <회사명> --page 12-14  # 그 페이지 본문만 출력
+    python3 portfolio/_extract.py <이력서.pdf> _portfolio        # /exp-add 임포트용 → portfolio/_sources/
 
 이미지 한 장은 대화에 들어가면 이후 매 호출마다 다시 전송된다(한 장 ≈ 1,500토큰).
 그래서 PDF·이미지는 Read로 직접 보지 말고, 이 스크립트로 텍스트 파일을 만든 뒤 필요한 페이지만 읽는다.
@@ -124,7 +125,7 @@ def page_count_guess(src):
 
 # ── 저장·출력 ────────────────────────────────────────────────
 def out_path(src, company):
-    d = REPO / "companies" / company / "sources"
+    d = ROOT / "_sources" if company == "_portfolio" else REPO / "companies" / company / "sources"
     d.mkdir(parents=True, exist_ok=True)
     return d / (Path(src).stem + ".md")
 

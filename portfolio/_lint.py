@@ -10,7 +10,7 @@
 즉석 검사 스크립트를 짜거나 초안을 명령에 다시 타이핑하지 않기 위한 도구다.
 판정: ❌ 규칙 위반(사용자에게 보이기 전에 고친다) / ⚠️ 판단 필요(에이전트가 확인).
 포지셔닝·인과의 진위·톤은 검사하지 않는다 — 그건 루브릭(`/retro` A)이 본다.
-규칙 원문은 `/answer` SKILL.md 「세 번째 원칙」·3-2~3-5. 규칙을 바꾸면 여기 목록도 함께 고친다.
+규칙 원문은 `/answer` SKILL.md 「문체」·「기계 검사」. 규칙을 바꾸면 여기 목록도 함께 고친다.
 """
 import re
 import sys
@@ -123,7 +123,7 @@ def parse_type(s):
     return m.group(1) if m else ("D" if "항목 기입" in s else None)
 
 
-def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=(), pool=None, label="", per_item=False, corpus=None):
+def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=(), pool=None, label="", per_item=False, corpus=None, jd_terms=()):
     body = clean(body)
     title, text = split_title(body)
     sents = sentences(body)
@@ -174,7 +174,10 @@ def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=
         if kind == "narr" and len(L) >= 6 and sum(x >= 60 for x in L) / len(L) < MIN_SHARE_LONG:
             W.append("전부 단문에 가까움 — 인과·역접을 종속절로 흡수해 60~80자를 1/3쯤 섞는다")
     # 4. 금지 표현
-    bad = ([f"가운뎃점 {body.count('·')}개(쉼표로)"] if "·" in body else []) + \
+    mid = body
+    for k in jd_terms:                      # JD 표기 그대로 쓴 용어의 가운뎃점은 허용
+        mid = mid.replace(k, "")
+    bad = ([f"가운뎃점 {mid.count('·')}개(쉼표로, JD 표기 용어는 예외)"] if "·" in mid else []) + \
           [f"\"{w}\" {text.count(w)}회" for w in ORDER_LABELS + COLLOQUIAL if w in text]
     (E if bad else OK).append("금지 표현: " + ", ".join(bad) if bad else "금지 표현 없음")
     br = [f"\"{w}\"" for w in BRIDGES if w in text]
@@ -279,7 +282,7 @@ def coverage(company, blocks, kw):
         st = sp.read_text(encoding="utf-8")
         if not kw:
             m = re.search(r"^-\s*JD 키워드[^:]*:\s*(.+)$", st, re.M)
-            kw = [k.strip(" `*") for k in re.split(r"[,·/]", m.group(1)) if k.strip(" `*")] if m else []
+            kw = [k.strip(" `*") for k in re.split(r"[,，、]", m.group(1)) if k.strip(" `*")] if m else []
         try:
             draft = from_session(company)["body"]
         except SystemExit:
@@ -310,6 +313,12 @@ def main(argv):
     pool = portfolio_pool()
     corpus = source_corpus(company)
     blocks = answer_blocks(company)
+    jd_terms = [k for k in kw if "·" in k]
+    sp = REPO / "applications" / company / "session.md"
+    if sp.exists():
+        m = re.search(r"^-\s*JD 키워드[^:]*:\s*(.+)$", sp.read_text(encoding="utf-8"), re.M)
+        if m:
+            jd_terms += [k.strip(" `*") for k in re.split(r"[,，、]", m.group(1)) if "·" in k]
     if "--coverage" in args:
         return coverage(company, blocks, kw)
     others_of = lambda body: [(b["head"][:20], shingles(clean(b["body"]))) for b in blocks
@@ -321,19 +330,19 @@ def main(argv):
             return 0
         for b in blocks:
             errs += lint(b["body"], b["limit"], b["no_space"], b["qtype"], others=others_of(b["body"]),
-                         kw=kw, pool=pool, label=b["head"][:48], per_item=b["per_item"], corpus=corpus)
+                         kw=kw, pool=pool, label=b["head"][:48], per_item=b["per_item"], corpus=corpus, jd_terms=jd_terms)
         print(f"■ {company} {len(blocks)}문항 — ❌ 합계 {errs}")
     elif opt("--file"):
         body = Path(opt("--file")).read_text(encoding="utf-8")
         errs = lint(body, int(opt("--limit")) if opt("--limit") else None, "--no-space" in args,
-                    opt("--type"), others=others_of(body), kw=kw, pool=pool, label=f"{company} {opt('--file')}", corpus=corpus)
+                    opt("--type"), others=others_of(body), kw=kw, pool=pool, label=f"{company} {opt('--file')}", corpus=corpus, jd_terms=jd_terms)
     else:
         s = from_session(company)
         if not s["body"]:
             print("❌ session.md 「현재 초안」이 비어 있다")
             return 1
         errs = lint(s["body"], s["limit"], s["no_space"], s["qtype"], locked=s["locked"],
-                    others=others_of(s["body"]), kw=kw, pool=pool, label=s["head"], corpus=corpus)
+                    others=others_of(s["body"]), kw=kw, pool=pool, label=s["head"], corpus=corpus, jd_terms=jd_terms)
     return 1 if errs else 0
 
 

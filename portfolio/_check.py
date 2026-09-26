@@ -55,8 +55,11 @@ def load():
         frag = Counter()
         sec = re.search(r'## 증거 조각(.*?)(?=\n## |\Z)', t, re.S)
         n_frag = 0
+        bad_frag = []
         if sec:
             for line in sec.group(1).split('\n'):
+                if re.match(r'- \[[^\]]+\]', line.strip()):
+                    bad_frag.append(line.strip()[:30])
                 m = re.match(r'- `((?:\[[^\]]+\])+)`', line.strip())
                 if m:
                     n_frag += 1
@@ -68,11 +71,11 @@ def load():
             path=p, type=g('type'), quant=g('quant').startswith('true'),
             ready=g('material_ready').startswith('true'),
             tags=set(x.strip() for x in re.sub(r'[\[\]]', '', g('tags')).split(',') if x.strip()),
-            frag=frag, n_frag=n_frag, links=links - {i},
+            frag=frag, n_frag=n_frag, bad_frag=bad_frag, links=links - {i},
             has_star=bool(re.search(r'^## S — 상황', t, re.M)),
             projects=re.findall(r'prj-\d+', g('projects')),
             heads=re.findall(r'^## (.+)$', t, re.M),
-            hist=(re.findall(r'\d{4}-\d{2}-\d{2}', t) + re.findall(r'^## .*(?:정정|역류|이력).*$', t, re.M))[:2],
+            hist=(re.findall(r'\d{4}-\d{2}-\d{2}', t) + re.findall(r'^## .*(?:정정|역류).*$', t, re.M))[:2],
         )
     return exps
 
@@ -143,6 +146,8 @@ for i, v in E.items():
         miss = [h for h in ('개요', '구성', '전체 성과') if not any(x.split(' (')[0] == h for x in v['heads'])]
         if miss:
             err.append(f"[5] {i}: container 섹션 누락 — {', '.join(miss)} (이름 고정: 개요 / 구성 (하위 프로젝트) / 전체 성과)")
+    if v['bad_frag']:
+        err.append(f"[6] {i}: 증거 조각 형식 — 태그를 백틱으로 감싼다: - `[태그]` 사실 (현재: {v['bad_frag'][0]}…)")
     if v['hist']:
         err.append(f"[5] {i}: 정정 경위가 파일에 있음 — {v['hist']} → portfolio/_history.md로 옮기고 현재 사실만 남길 것")
     if v['type'] not in ('episode', 'container'):
