@@ -2,6 +2,13 @@
 
 버전 규칙: 규칙·스킬 동작이 바뀌면 minor(v1.x.0), 문구·오탈자만 고치면 patch(v1.0.x).
 
+## v1.4.0 — 2026-09-26
+기술 인벤토리(`skills.md`) 연결.
+
+- `/company-analyze`: fit-matrix 매칭 전 `profile.md`(정형 요건)와 함께 `skills.md`(기술 스택·숙련도·근거 ID)를 대조 — JD 기술 요건을 `⚠️ 확인 필요`로 잘못 남기는 것을 방지. 기존엔 어떤 스킬도 읽지 않던 파일.
+- `/exp-add`: 새 기술·툴·자격이 나오면 `skills.md`도 갱신.
+- `portfolio/_templates/skills.md` 추가, README 설치 명령·폴더 표에 반영.
+
 ## v1.3.1 — 2026-09-26
 README 압축 (문서만 변경, 동작 변화 없음).
 

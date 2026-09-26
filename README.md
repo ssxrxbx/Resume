@@ -88,7 +88,7 @@ flowchart LR
 
 ```bash
 git clone https://github.com/ssxrxbx/Resume.git && cd Resume
-for f in profile INDEX TAGS; do cp portfolio/_templates/$f.md portfolio/$f.md; done
+for f in profile INDEX TAGS skills; do cp portfolio/_templates/$f.md portfolio/$f.md; done
 cp portfolio/_templates/IMPROVEMENTS.md IMPROVEMENTS.md
 ```
 
@@ -101,7 +101,7 @@ Claude Code에서 폴더를 열고 `/exp-add`로 경험부터 채웁니다. 업�
 AGENTS.md · .agents/            Codex용 사본              │ 공개
 portfolio/_*.py · _templates/   스크립트 · 템플릿         ┘
 portfolio/career · activities · projects   경험 (car- / act- / prj-)   ┐
-portfolio/profile · INDEX · TAGS           프로필 · 색인 · 태그 어휘   │ 개인
+portfolio/profile · INDEX · TAGS · skills  프로필 · 색인 · 태그 · 기술   │ 개인
 companies/회사명/                           분석 · sources(추출 텍스트) │ (git 제외)
 applications/회사명/                        answers · session          │
 IMPROVEMENTS.md                            개선 로그                  ┘

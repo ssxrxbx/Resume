@@ -47,7 +47,7 @@ portfolio/projects/    prj-*   프로젝트 (구체 산출물)
 6. **증거 조각(`## 증거 조각`) 작성** — 본문과 별개로, 그 경험에서 **답안에 그대로 꺼내 쓸 수 있는 원자 단위 사실**을 목록으로 뽑는다. 아래 "증거 조각 규칙" 참고. (3단계 `/answer`가 본문을 매번 재해석하는 대신 여기서 조각을 골라 조립한다)
 7. **연결 설정**: 프로젝트면 `activity:`에 소속 활동 ID, 활동이면 `projects:[]`에 하위 프로젝트 ID.
    기타 관계는 양쪽 `related:[]`에 상호 기재. container면 하위 프로젝트를 `## 구성`에도 링크한다.
-8. frontmatter의 `id`, `category`, `type`, `material_ready`, `quant`를 실제 상태에 맞게 설정.
+8. frontmatter의 `id`, `category`, `type`, `material_ready`, `quant`를 실제 상태에 맞게 설정. 경험에 새 기술·툴·자격이 나오면 `portfolio/skills.md`에도 숙련도와 근거 ID를 함께 반영한다(`/company-analyze`가 JD 기술 요건을 여기서 대조한다).
 9. **`portfolio/INDEX.md`를 frontmatter 기준으로 재생성** (⚠️ 아래 "INDEX 재생성 규칙" 참고 — 손으로 베끼지 말 것).
 10. (Notion 미러가 설정돼 있으면) 해당 경험을 Notion에도 반영.
 
