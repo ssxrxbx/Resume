@@ -79,7 +79,7 @@ flowchart LR
 |---|---|
 | `python3 portfolio/_check.py` | 경험 파일 ↔ INDEX 정합성 + 규칙 파일 분량 예산 검사 (오류 0이 기준, `--sync`로 Codex 사본 갱신) |
 | `python3 portfolio/_usage.py 회사명` | 그 회사 답안에서 경험이 한쪽에 쏠렸는지 집계 |
-| `python3 portfolio/_lint.py 회사명` | 초안의 글자 수·문장 길이·금지 표현·🔒 보존·복붙 검사 |
+| `python3 portfolio/_lint.py 회사명` | 초안의 글자 수·문장 길이·금지 표현·🔒 보존·복붙·**원본에 없는 수치** 검사 (`--coverage`: 지원서 전체 JD 키워드 커버리지) |
 | `python3 portfolio/_extract.py 파일 회사명` | PDF·이미지 → 텍스트 파일 + 목차 (`--find`, `--page`) |
 
 `_extract.py`는 macOS에선 설치 없이 OCR까지 됩니다. Windows·Linux는 `pip install pypdf pypdfium2` + Tesseract(한국어)를 권장하고, 없으면 하위 에이전트가 대신 읽습니다.

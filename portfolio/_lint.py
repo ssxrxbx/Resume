@@ -4,7 +4,8 @@
     python3 portfolio/_lint.py <회사명>                    # session.md 「현재 초안」
     python3 portfolio/_lint.py <회사명> --file x.txt [--limit 800] [--type A]
     python3 portfolio/_lint.py <회사명> --all              # answers.md 저장본 전체 (회고·보정용)
-    옵션: --kw "키워드1,키워드2"   JD 키워드 포함 여부
+    python3 portfolio/_lint.py <회사명> --coverage         # JD 키워드가 지원서 전체의 어느 문항에 있나
+    옵션: --kw "키워드1,키워드2"   JD 키워드 포함 여부 (--coverage는 없으면 session.md 「분석 요약」에서 읽는다)
 
 즉석 검사 스크립트를 짜거나 초안을 명령에 다시 타이핑하지 않기 위한 도구다.
 판정: ❌ 규칙 위반(사용자에게 보이기 전에 고친다) / ⚠️ 판단 필요(에이전트가 확인).
@@ -32,6 +33,8 @@ MIN_SHARE_LONG = 0.15   # 서술형: 60자↑ 문장이 이 비율 미만이면 
 COPY_MIN = 25           # 같은 회사 다른 문항과 이 길이 이상 연속 일치하면 중복 경고
 COPY_MIN_SRC = 30       # 포트폴리오 원본과는 이 길이 이상 (서비스명·설명구 수준의 짧은 일치는 정상)
 FILL = 0.95             # 글자 수 목표: 제한의 95% 이상
+# 수치 근거: "숫자+단위"가 경험 파일·회사 분석에 없으면 ⚠️ (합산·외부 출처면 근거를 남기고 유지)
+NUM = re.compile(r"(\d+(?:[.,]\d+)*)\s*(%|퍼센트|배|건|명|개사|개|종|곳|팀|위|회|주|개월|년|시간|초|분|만|억|천)")
 
 
 def clean(t):
@@ -92,6 +95,18 @@ def portfolio_pool():
     return pool
 
 
+def source_corpus(company):
+    """수치 근거를 찾을 원천: 경험 파일·프로필·기술 + 그 회사 분석(이름이 겹치는 폴더 포함). _history는 제외."""
+    fs = [f for f in ROOT.glob("**/*.md") if "_templates" not in f.parts and f.name != "_history.md"
+          and f.name not in ("INDEX.md", "TAGS.md")]
+    cdir = REPO / "companies"
+    if cdir.exists():
+        for d in cdir.iterdir():
+            if d.is_dir() and (company.startswith(d.name) or d.name.startswith(company)):
+                fs += list(d.glob("**/*.md"))
+    return clean("\n".join(f.read_text(encoding="utf-8") for f in fs)).replace(",", "")
+
+
 def short(s, n=34):
     return s if len(s) <= n else s[:n] + "…"
 
@@ -108,7 +123,7 @@ def parse_type(s):
     return m.group(1) if m else ("D" if "항목 기입" in s else None)
 
 
-def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=(), pool=None, label="", per_item=False):
+def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=(), pool=None, label="", per_item=False, corpus=None):
     body = clean(body)
     title, text = split_title(body)
     sents = sentences(body)
@@ -192,6 +207,14 @@ def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=
         miss = [k for k in kw if k not in text]
         (W if miss else OK).append(f"JD 키워드 {len(kw) - len(miss)}/{len(kw)}" + (f" — 없음: {', '.join(miss)}" if miss else ""))
 
+    # 10. 수치 근거 (🔒 문장 제외)
+    if corpus is not None:
+        judged_text = " ".join(s for s in sents if not any(s in l or l in s for l in lk))
+        miss = sorted({m.group(0) for m in NUM.finditer(judged_text)
+                       if not re.search(rf"(?<![\d.]){re.escape(m.group(1).replace(',', ''))}\s*{re.escape(m.group(2))}", corpus)})
+        (W if miss else OK).append("수치 근거 확인" if not miss else
+            f"원본에 없는 수치 {len(miss)}개 — {', '.join(miss[:6])} (합산·외부 출처면 근거를 사용 경험 ID에 남기고, 아니면 원본 수치로 고친다)")
+
     typ = qtype or "?"
     print(f"■ {label} ({limit or '제한 없음'}{'자' if limit else ''}, {typ}형) — 공백 포함 {n_sp} / 제외 {n_ns}")
     print("✅ " + " · ".join(OK))
@@ -248,6 +271,35 @@ def from_session(company):
                 limit=limit, no_space=ns, qtype=parse_type(qline), locked=locked)
 
 
+def coverage(company, blocks, kw):
+    """JD 키워드가 지원서 전체(저장 답안 + 현재 초안)의 어느 문항에 들어 있는지. 빈 축을 찾는다."""
+    sp = REPO / "applications" / company / "session.md"
+    draft = ""
+    if sp.exists():
+        st = sp.read_text(encoding="utf-8")
+        if not kw:
+            m = re.search(r"^-\s*JD 키워드[^:]*:\s*(.+)$", st, re.M)
+            kw = [k.strip(" `*") for k in re.split(r"[,·/]", m.group(1)) if k.strip(" `*")] if m else []
+        try:
+            draft = from_session(company)["body"]
+        except SystemExit:
+            pass
+    if not kw:
+        print("❌ 키워드 없음 — --kw \"A,B\" 로 주거나 session.md 「분석 요약」의 'JD 키워드' 줄을 채운다")
+        return 1
+    docs = [(b["head"].split("]")[0].lstrip("Q. [")[:14] or b["head"][:14], clean(b["body"])) for b in blocks]
+    if draft:
+        docs.append(("현재 초안", clean(draft)))
+    print(f"■ {company} JD 키워드 커버리지 — 문항 {len(docs)}개")
+    empty = []
+    for k in kw:
+        where = [n for n, d in docs if k in d]
+        empty += [] if where else [k]
+        print(f"  {'✅' if where else '⚠️ '} {k:16s} {', '.join(where) if where else '어느 문항에도 없음'}")
+    print(f"→ 빈 축 {len(empty)}/{len(kw)}" + (f": {', '.join(empty)} — 남은 문항에 배정하거나 이유를 남긴다" if empty else ""))
+    return 0
+
+
 def main(argv):
     if len(argv) < 2 or argv[1].startswith("-"):
         print(__doc__)
@@ -256,7 +308,10 @@ def main(argv):
     opt = lambda k: args[args.index(k) + 1] if k in args else None
     kw = [k.strip() for k in (opt("--kw") or "").split(",") if k.strip()]
     pool = portfolio_pool()
+    corpus = source_corpus(company)
     blocks = answer_blocks(company)
+    if "--coverage" in args:
+        return coverage(company, blocks, kw)
     others_of = lambda body: [(b["head"][:20], shingles(clean(b["body"]))) for b in blocks
                               if clean(b["body"]) != clean(body)]
     errs = 0
@@ -266,19 +321,19 @@ def main(argv):
             return 0
         for b in blocks:
             errs += lint(b["body"], b["limit"], b["no_space"], b["qtype"], others=others_of(b["body"]),
-                         kw=kw, pool=pool, label=b["head"][:48], per_item=b["per_item"])
+                         kw=kw, pool=pool, label=b["head"][:48], per_item=b["per_item"], corpus=corpus)
         print(f"■ {company} {len(blocks)}문항 — ❌ 합계 {errs}")
     elif opt("--file"):
         body = Path(opt("--file")).read_text(encoding="utf-8")
         errs = lint(body, int(opt("--limit")) if opt("--limit") else None, "--no-space" in args,
-                    opt("--type"), others=others_of(body), kw=kw, pool=pool, label=f"{company} {opt('--file')}")
+                    opt("--type"), others=others_of(body), kw=kw, pool=pool, label=f"{company} {opt('--file')}", corpus=corpus)
     else:
         s = from_session(company)
         if not s["body"]:
             print("❌ session.md 「현재 초안」이 비어 있다")
             return 1
         errs = lint(s["body"], s["limit"], s["no_space"], s["qtype"], locked=s["locked"],
-                    others=others_of(s["body"]), kw=kw, pool=pool, label=s["head"])
+                    others=others_of(s["body"]), kw=kw, pool=pool, label=s["head"], corpus=corpus)
     return 1 if errs else 0
 
 
