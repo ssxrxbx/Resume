@@ -49,9 +49,9 @@ NUM = re.compile(r"(\d+(?:[.,]\d+)*)\s*(%|배|건|명|개사|개|종|곳|팀|위
 
 
 def body_only_nums(t, frag):
-    """본문(STAR·개요·구성·전체 성과)에 있는데 증거 조각엔 없는 수치 — ⛔ 사용 제한 줄은 제외."""
+    """본문(STAR·개요·전체 성과)에 있는데 증거 조각엔 없는 수치 — ⛔ 줄 제외. container 「구성」은 하위 파일 수치의 요약이라 제외."""
     body = "".join(m.group(1) for m in re.finditer(
-        r'^## (?:S — 상황|T — 과제|A — 행동|R — 결과|개요|구성|전체 성과)[^\n]*\n(.*?)(?=^## |\Z)', t, re.S | re.M))
+        r'^## (?:S — 상황|T — 과제|A — 행동|R — 결과|개요|전체 성과)[^\n]*\n(.*?)(?=^## |\Z)', t, re.S | re.M))
     body = "\n".join(l for l in body.split("\n") if not l.lstrip("> ").startswith("⛔")).replace(",", "")
     frag = frag.replace(",", "")
     return sorted({m.group(0) for m in NUM.finditer(body)
@@ -129,6 +129,13 @@ n_rows = len(re.findall(r'^\| (?:car|act|prj)-\d+ \|', idx, re.M))
     f"[1] INDEX 행 수 불일치: 파일 {len(E)} vs INDEX {n_rows}" if n_rows != len(E)
     else f"[1] INDEX 행 수 == 파일 수 ({len(E)}) ✅")
 
+# 1-b. INDEX 생성 영역 == frontmatter (_index.py)
+sys.path.insert(0, ROOT)
+import _index
+nd = _index.drift()
+(err.append if nd else print)(f"[1-b] INDEX가 frontmatter와 {nd}줄 다름 — python3 portfolio/_index.py (손으로 고치지 않는다)" if nd
+                               else "[1-b] INDEX 생성 영역 == frontmatter ✅")
+
 # 2. 태그 역색인 양방향
 sec = idx.split('## 태그별 인덱스')[1].split('\n## ')[0]
 inv = {}
@@ -168,7 +175,7 @@ for a, b in asym:
     err.append(f"[4] 연결 비대칭: {a}→{b} 인데 {b}→{a} 없음")
 iso = [i for i, v in E.items() if not v['links']]
 if iso:
-    warn.append(f"[4] 고립 경험(연결 없음): {', '.join(iso)} — 진짜 독립이면 그대로 두되 인지")
+    print(f"[4] 참고 — 연결 없는 독립 경험: {', '.join(iso)} (억지로 잇지 않는다)")
 if not asym:
     print("[4] 연결 대칭 ✅")
 
@@ -273,8 +280,8 @@ for ap in sorted(glob.glob(os.path.join(REPO, 'applications', '*', 'answers.md')
             err.append(f"[11] {co} answers.md:{k} 원본 정정 미반영 — portfolio/ 원본·_history.md에 반영하고 이 줄에 ✅ (사용자 확인 전이면 INDEX 「사실 확인 대기」로 옮기고 '→ 확인 대기')")
     m = re.search(r'^>\s*제출:\s*(.+)$', '\n'.join(txt.split('\n')[:8]), re.M)
     status = m.group(1).strip() if m else ''
-    if not m:
-        warn.append(f"[11] {co}: 제출 상태 표기 없음 — 파일 첫머리에 `> 제출: YYYY-MM-DD` 또는 `> 제출: 미제출` (모르면 제출로 본다)")
+    if not m or status.startswith('확인'):
+        warn.append(f"[11] {co}: 제출 상태 {'확인 필요' if m else '표기 없음'} — 첫머리 `> 제출: YYYY-MM-DD` 또는 `> 제출: 미제출` (모르면 제출로 본다)")
     caution = next((s for s in re.split(r'^## ', txt, flags=re.M) if s.startswith('면접 주의')), '')
     for b in _lint.answer_blocks(co):
         for w, alt, why, s in _lint.ban_hits(b['body'], FACT_BAN):

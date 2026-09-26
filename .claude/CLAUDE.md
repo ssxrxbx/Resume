@@ -22,7 +22,7 @@
 ## 저장·정합성
 - 원본은 로컬 마크다운. Notion 미러를 쓰면(`profile.md` 「에이전트 설정」에 표시) 충돌 시 로컬 우선.
 - `python3 portfolio/_check.py`로 검사한다(경험 변경 후, `/answer` 시작 시, `/retro` 딥 회고 시). **오류 0이 기준.**
-- `INDEX.md`는 frontmatter의 파생물. 한 줄 끼워넣기 금지, 재생성한다(`/exp-add` 「INDEX 재생성 규칙」).
+- `INDEX.md`는 frontmatter의 파생물. 손으로 고치지 않고 `python3 portfolio/_index.py`로 재생성한다.
 - 과거 제출 자소서(외부 보관처)는 미러하지 않고 필요할 때만 조회한다(위치는 `portfolio/profile.md` 「에이전트 설정」). 검증된 사실은 `portfolio/`로 옮긴다.
 - 승인된 답안은 `applications/{회사명}/answers.md`에 누적한다(덮어쓰기 금지).
 

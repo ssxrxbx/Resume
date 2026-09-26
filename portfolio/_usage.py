@@ -4,7 +4,7 @@
 사용:  python3 portfolio/_usage.py <회사명>
 예:    python3 portfolio/_usage.py 회사명
 
-`/answer` 「2. 후보 스캔」의 선행 단계. `--exp prj-08`: 모든 회사 답안에서 그 경험을 쓴 문장만(프레이밍 일관성 확인). 인라인 스크립트를 쓰지 않는 이유:
+`/answer` 「2. 후보 스캔」의 선행 단계. `--exp prj-08`: 모든 회사 답안에서 그 경험을 쓴 문장만(프레이밍 일관성 확인). `--results`: 회사별 제출·결과·지원 유형·주력 계열(`/retro` 결과 검증). 인라인 스크립트를 쓰지 않는 이유:
 아카이브 포맷이 회사마다 조금씩 달라(`### 사용 경험 ID` 헤딩 / `**사용 경험 ID**:` 볼드,
 `[car-01](링크)` / `**car-01**` 표기) 정규식 하나로는 조용히 0건을 리턴한다.
 편중 경보가 "미사용"으로 오작동하면 편중을 못 잡으므로, 포맷 관용적으로 파싱한다.
@@ -206,7 +206,33 @@ def unsure_facts(eid):
             print(f"    {l[:160]}")
 
 
+def results():
+    """회사별 제출·결과·지원 유형·주력 계열 — `/retro` 결과 검증의 입력. answers.md 첫머리 `> 제출:`·`> 결과:`·`> 지원 유형:`에서 읽는다."""
+    roster, _, parent_of = load_roster()
+    rows = []
+    for f in sorted((REPO / "applications").glob("*/answers.md")):
+        head = "\n".join(f.read_text(encoding="utf-8").split("\n")[:8])
+        g = lambda k: (re.search(rf"^>\s*{k}:\s*(.+)$", head, re.M) or [None, "—"])[1].strip()
+        per = Counter()
+        for b in parse_blocks(f.read_text(encoding="utf-8")):
+            per.update({parent_of.get(i, i) for i in ids_in_block(b)[0]})
+        top = ", ".join(f"{k}×{v}" for k, v in per.most_common(3))
+        rows.append((f.parent.name, g("제출"), g("결과"), g("지원 유형"), top))
+    print("| 회사 | 제출 | 결과 | 지원 유형 | 주력 계열(문항 수) |\n|---|---|---|---|---|")
+    for r in rows:
+        print("| " + " | ".join(r) + " |")
+    res = [r[2] for r in rows]
+    passed = sum("합격" in x and "불합격" not in x for x in res)
+    failed = sum("불합격" in x for x in res)
+    print(f"\n결과 기록: 합격 {passed} · 불합격 {failed} · 미기록 {len(rows) - passed - failed}"
+          + ("  ← 합격·불합격이 모두 있어 비교할 수 있다" if passed and failed else
+             "  ← 결과가 나오면 answers.md 첫머리에 `> 결과: 서류 합격|서류 불합격|대기`"))
+    return 0
+
+
 if __name__ == "__main__":
+    if "--results" in sys.argv:
+        sys.exit(results())
     if "--exp" in sys.argv:
         sys.exit(by_experience(sys.argv[sys.argv.index("--exp") + 1]))
     if len(sys.argv) < 2:

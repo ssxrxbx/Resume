@@ -12,6 +12,8 @@ __pycache__/
 portfolio/*
 !portfolio/_check.py
 !portfolio/_usage.py
+!portfolio/_index.py
+!portfolio/_regress.py
 !portfolio/_lint.py
 !portfolio/_extract.py
 !portfolio/_extract.swift

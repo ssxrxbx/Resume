@@ -78,8 +78,10 @@ flowchart LR
 | 명령 | 하는 일 |
 |---|---|
 | `python3 portfolio/_check.py` | 경험 파일 ↔ INDEX 정합성 + 규칙 파일 분량 예산 + **지원서 사실 점검**(원본에 안 옮긴 정정, 제출본에 들어간 사실 오류 → `## 면접 주의`) (오류 0이 기준, `--sync`로 Codex 사본 갱신) |
-| `python3 portfolio/_usage.py 회사명` | 경험 사용 횟수·편중 + 전체 경험 로스터(한 줄씩, ⭐ 정량 보강 1순위 · 💤 미활용 강한 재료). `--exp ID`: 다른 회사 답안에서 그 경험을 쓴 줄 + 그 경험의 미확인 사실 |
+| `python3 portfolio/_usage.py 회사명` | 경험 사용 횟수·편중 + 전체 경험 로스터(한 줄씩, ⭐ 정량 보강 1순위 · 💤 미활용 강한 재료). `--exp ID`: 다른 회사 답안에서 그 경험을 쓴 줄 + 그 경험의 미확인 사실 · `--results`: 회사별 제출·서류 결과·지원 유형·주력 계열 |
+| `python3 portfolio/_index.py` | INDEX.md 재생성 — 표·연결 맵·태그 인덱스를 frontmatter에서 뽑는다(손으로 고치지 않는다, `_check.py`가 드리프트 검사) |
 | `python3 portfolio/_lint.py 회사명` | 초안의 글자 수·문장 길이·금지 표현(`_terms.md`)·🔒 보존·복붙·라벨 복사·**원본에 없는·미확인 수치** 검사 (`--all`: 저장본 전체, 검사 못 한 문항도 알림 · `--coverage`: 지원서 전체 JD 키워드 커버리지) |
+| `python3 portfolio/_regress.py` | 회귀 테스트 — 승인 답안을 현재 규칙으로 블라인드 재작성·채점할 지시문과 비교 재료 생성(`/retro`) |
 | `python3 portfolio/_extract.py 파일 회사명` | PDF·이미지 → 텍스트 파일 + 목차 (`--find`, `--page`). 이력서 임포트는 회사명 대신 `_portfolio` |
 
 `_extract.py`는 macOS에선 설치 없이 OCR까지 됩니다. Windows·Linux는 `pip install pypdf pypdfium2` + Tesseract(한국어)를 권장하고, 없으면 하위 에이전트가 대신 읽습니다.

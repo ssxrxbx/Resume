@@ -29,7 +29,7 @@ description: 경험을 STAR + 역량 태그 구조로 포트폴리오에 추가�
 7. 연결: 활동 산하 프로젝트는 `activity: act-NN`, 경력 산하 프로젝트는 `career: car-NN` ↔ 상위의 `projects:[]`. 그 외 양쪽 `related:[]`. container는 「구성 (하위 프로젝트)」에도 링크한다.
 8. frontmatter `id·category·type·material_ready·quant`를 실제 상태로. `material_ready`는 episode = STAR+조각, container = 개요+하위 연결+조각이다. STAR가 없다고 container를 `false`로 두지 않는다.
 9. 새 기술·툴·자격이 나오면 `portfolio/skills.md`에 숙련도와 근거 ID를 반영한다(`/company-analyze`가 JD 기술 요건을 여기서 대조한다).
-10. INDEX를 재생성한다(아래 규칙). Notion 미러를 쓰면(`profile.md` 「에이전트 설정」) 반영한다.
+10. `python3 portfolio/_index.py`로 INDEX를 재생성한다. Notion 미러를 쓰면(`profile.md` 「에이전트 설정」) 반영한다.
 
 ## 정정·보강 규칙 (`/answer` 중 원본 역류 포함)
 - 파일은 **정정된 현재 사실로 바로 고쳐 쓴다.** 괄호 메모·「정정 이력」 섹션을 붙이지 않는다.
@@ -52,12 +52,8 @@ description: 경험을 STAR + 역량 태그 구조로 포트폴리오에 추가�
 - 3~8개. 본문에 없는 사실은 넣지 않고, 본문이 바뀌면 함께 고친다.
 - **조각 태그 ↔ frontmatter `tags` 정합**: 조각 태그가 frontmatter에 없으면 그 역량으로 검색해도 안 걸린다. 조각 2개 이상에 나오거나 핵심 서사인 태그는 `tags`로 **승격**하고, 1개에서 부수적으로만 스치면 조각에만 둔다.
 
-## INDEX 재생성 규칙 (drift 방지)
-`INDEX.md`는 frontmatter의 파생물이다. 기존 줄에 ID를 끼워넣지 말고 frontmatter를 단일 진실원으로 **전부 다시 뽑는다.** 사실 정정으로 `tags`만 바뀌어도 같다.
-1. 전체 경험 파일 frontmatter 스캔: id·category·type·title·period·tags·quant·material_ready·activity·projects·related.
-2. 4개 섹션 재산출: 카테고리별 표(id·유형·제목·기간·태그요약·정량·재료) / 연결 맵 / 태그별 역색인(처음부터 모든 (태그, ID) 쌍을 `- **태그**: id, id` 한 줄씩) / 보강 필요 TODO.
-3. `python3 portfolio/_check.py` — 오류 0. 경고는 조치하거나 유지 사유를 남긴다. 어긋나면 **INDEX를 고친다**(경험 파일을 INDEX에 맞추지 않는다).
-4. INDEX 상단 "최종 갱신"에 날짜와 변경 요약.
+## INDEX 갱신
+`python3 portfolio/_index.py`가 frontmatter에서 표·연결 맵·태그 인덱스를 다시 뽑는다(손으로 고치지 않는다). 사람이 관리하는 건 「보강 필요」·「사실 확인 대기」뿐이다. 이어서 `_check.py` 오류 0.
 
 ## 인터뷰 모드
 한 번에 하나씩 묻는다: 상황 → 과제 → 내가 한 행동 → 결과(숫자) → 배운 점. "그때 수치로 어느 정도였나요?"로 정량을 끌어낸다.
