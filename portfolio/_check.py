@@ -10,7 +10,33 @@ import glob, os, re, sys
 from collections import Counter, defaultdict
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(ROOT)
 os.chdir(ROOT)
+
+# 규칙 파일 분량 예산(글자 수). 증액은 사용자 승인 후에만 — CLAUDE.md 「규칙 파일 관리」
+DOC_BUDGET = {
+    '.claude/CLAUDE.md': 4800,
+    '.claude/skills/answer/SKILL.md': 10000,
+    '.claude/skills/company-analyze/SKILL.md': 4800,
+    '.claude/skills/exp-add/SKILL.md': 3500,
+    '.claude/skills/retro/SKILL.md': 3600,
+}
+# Codex 사본: 원본 → 사본 (스킬 사본은 CLAUDE.md 표기를 AGENTS.md로)
+MIRRORS = [('.claude/CLAUDE.md', 'AGENTS.md')] + [
+    (p, p.replace('.claude/skills/', '.agents/skills/')) for p in DOC_BUDGET if '/skills/' in p]
+
+
+def mirror_text(src):
+    t = open(os.path.join(REPO, src), encoding='utf-8').read()
+    return t if src == '.claude/CLAUDE.md' else t.replace('CLAUDE.md', 'AGENTS.md')
+
+
+if '--sync' in sys.argv:
+    for src, dst in MIRRORS:
+        os.makedirs(os.path.dirname(os.path.join(REPO, dst)) or REPO, exist_ok=True)
+        open(os.path.join(REPO, dst), 'w', encoding='utf-8').write(mirror_text(src))
+        print(f"동기화 {src} → {dst}")
+    sys.exit(0)
 
 # 자소서 단골 문항이 요구하는 역량 — 각 최소 2건은 있어야 선택지가 생긴다
 STAPLE = ['실패극복', '갈등조정', '리더십', '위기관리', '성장', '협업',
@@ -154,6 +180,23 @@ if not any(x.startswith('[8-b]') for x in err):
 fam = {i: set([i] + v['projects']) for i, v in E.items() if v['type'] == 'container'}
 solo = [i for i, v in E.items() if v['type'] == 'episode' and not any(i in f for f in fam.values())]
 print(f"[9] 계열 {len(fam)}개 " + " · ".join(f"{k}+{len(v)-1}" for k, v in fam.items()) + f" · 독립 {len(solo)}건")
+
+# 10. 규칙 파일 분량 예산 + Codex 사본 동기화
+sizes = []
+for pth, cap in DOC_BUDGET.items():
+    fp = os.path.join(REPO, pth)
+    if not os.path.exists(fp):
+        continue
+    n = len(open(fp, encoding='utf-8').read())
+    name = 'CLAUDE.md' if pth.endswith('CLAUDE.md') else pth.split('/')[-2]
+    sizes.append(f"{name} {n:,}/{cap:,}")
+    if n > cap:
+        err.append(f"[10] {pth} {n:,}자 > 예산 {cap:,}자 — 합치거나 대체해 줄이고, 불가능하면 사용자에게 증액 제안")
+print("[10] 규칙 분량 " + " · ".join(sizes))
+for src, dst in MIRRORS:
+    d = os.path.join(REPO, dst)
+    if os.path.exists(os.path.join(REPO, src)) and (not os.path.exists(d) or open(d, encoding='utf-8').read() != mirror_text(src)):
+        err.append(f"[10] Codex 사본 불일치 {dst} — python3 portfolio/_check.py --sync")
 
 print()
 for w in warn:
