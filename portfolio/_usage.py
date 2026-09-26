@@ -85,14 +85,26 @@ def ids_in_block(block):
     return set(re.findall(ID, body)), True
 
 
+def total_usage():
+    """전 회사 답안에서 경험별 사용 횟수(로스터 표시용)."""
+    c = Counter()
+    for f in (REPO / "applications").glob("*/answers.md"):
+        for b in parse_blocks(f.read_text(encoding="utf-8")):
+            c.update(ids_in_block(b)[0])
+    return c
+
+
 def print_roster(roster, per_id, parent_of):
-    """후보 스캔용 전체 로스터 — INDEX.md 전체를 읽지 않아도 되게 한 줄씩(frontmatter 기준이라 항상 최신)."""
-    print(f"\n[로스터] {len(roster)}건 — ID 유형(e/c) 재료/정량 · 이 회사 사용 · 제목 — 한 줄 요약 · 태그")
+    """후보 스캔용 전체 로스터 — INDEX.md 전체를 읽지 않아도 되게 한 줄씩(frontmatter 기준이라 항상 최신).
+    ⭐ 보강 1순위 = 전체 5회↑ 쓰였는데 정량 △ / 💤 미활용 강한 재료 = 정량 ✅인데 전체 1회 이하."""
+    tot = total_usage()
+    print(f"\n[로스터] {len(roster)}건 — ID 유형(e/c) 재료/정량 · 이 회사 사용 · 제목 — 한 줄 요약 · 태그  (⭐ 정량 보강 1순위 · 💤 미활용 강한 재료)")
     for i in sorted(roster, key=lambda x: (x[:3] != "car", x[:3] != "act", x)):
         m = META.get(i, {})
         up = f" ↑{parent_of[i]}" if i in parent_of else ""
         used = f"{per_id[i]}회" if per_id.get(i) else "·"
-        print(f"  {i} {m.get('type','?')} {m.get('ready','?')}/{m.get('quant','?')} {used:>3}{up}  {roster[i]} — {m.get('summary','')} · {m.get('tags','')}")
+        flag = "⭐" if tot[i] >= 5 and m.get("quant") == "△" else "💤" if m.get("quant") == "✅" and tot[i] <= 1 else "  "
+        print(f"  {flag}{i} {m.get('type','?')} {m.get('ready','?')}/{m.get('quant','?')} {used:>3}{up}  {roster[i]} — {m.get('summary','')} · {m.get('tags','')}")
 
 
 def main(company):

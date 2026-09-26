@@ -45,6 +45,19 @@ STAPLE = ['실패극복', '갈등조정', '리더십', '위기관리', '성장',
 err, warn = [], []
 
 
+NUM = re.compile(r"(\d+(?:[.,]\d+)*)\s*(%|배|건|명|개사|개|종|곳|팀|위|회|주|개월|년|시간|초|분|만|억|천)")
+
+
+def body_only_nums(t, frag):
+    """본문(STAR·개요·구성·전체 성과)에 있는데 증거 조각엔 없는 수치 — ⛔ 사용 제한 줄은 제외."""
+    body = "".join(m.group(1) for m in re.finditer(
+        r'^## (?:S — 상황|T — 과제|A — 행동|R — 결과|개요|구성|전체 성과)[^\n]*\n(.*?)(?=^## |\Z)', t, re.S | re.M))
+    body = "\n".join(l for l in body.split("\n") if not l.lstrip("> ").startswith("⛔")).replace(",", "")
+    frag = frag.replace(",", "")
+    return sorted({m.group(0) for m in NUM.finditer(body)
+                   if not re.search(rf"(?<![\d.]){re.escape(m.group(1).replace(',', ''))}\s*{re.escape(m.group(2))}", frag)})
+
+
 def load():
     exps = {}
     for p in sorted(glob.glob('career/*.md') + glob.glob('activities/*.md') + glob.glob('projects/*.md')):
@@ -75,6 +88,9 @@ def load():
             has_star=bool(re.search(r'^## S — 상황', t, re.M)),
             projects=re.findall(r'prj-\d+', g('projects')),
             heads=re.findall(r'^## (.+)$', t, re.M),
+            body_only_nums=body_only_nums(t, sec.group(1) if sec else ''),
+            sec_links=set(re.findall(r'(?:car|act|prj)-\d+', ''.join(
+                m.group(1) for m in re.finditer(r'^## (?:연결|구성|하위 프로젝트)[^\n]*\n(.*?)(?=^## |\Z)', t, re.S | re.M)))),
             hist=(re.findall(r'\d{4}-\d{2}-\d{2}', t) + re.findall(r'^## .*(?:정정|역류).*$', t, re.M))[:2],
         )
     return exps
@@ -146,6 +162,15 @@ for i, v in E.items():
         miss = [h for h in ('개요', '구성', '전체 성과') if not any(x.split(' (')[0] == h for x in v['heads'])]
         if miss:
             err.append(f"[5] {i}: container 섹션 누락 — {', '.join(miss)} (이름 고정: 개요 / 구성 (하위 프로젝트) / 전체 성과)")
+    if v['body_only_nums']:
+        warn.append(f"[6-c] {i}: 본문에만 있는 수치 {', '.join(v['body_only_nums'][:5])} — 답안에 쓸 사실이면 증거 조각으로 옮긴다")
+    stray = v['sec_links'] - v['links'] - {i}
+    if stray:
+        err.append(f"[4-b] {i}: 「연결·구성」 섹션의 {', '.join(sorted(stray))}가 frontmatter 연결에 없음 — frontmatter(related 등)에 추가하거나 섹션에서 지운다")
+    if v['type'] == 'container' and len(v['tags']) > 10:
+        kids = set().union(*[E[k]['tags'] for k in v['projects'] if k in E]) if v['projects'] else set()
+        if kids and len(v['tags'] & kids) / len(v['tags']) >= 0.7:
+            warn.append(f"[3-b] {i}: container 태그 {len(v['tags'])}개 중 대부분이 하위 프로젝트 태그 복사 — container 레벨 역량만 남긴다(과다 매칭·편중 원인)")
     if v['bad_frag']:
         err.append(f"[6] {i}: 증거 조각 형식 — 태그를 백틱으로 감싼다: - `[태그]` 사실 (현재: {v['bad_frag'][0]}…)")
     if v['hist']:
