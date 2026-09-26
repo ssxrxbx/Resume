@@ -32,6 +32,7 @@ LEN = {  # 유형별 문장 길이: (목표 상한, 규칙 상한, 무조건 분
 MIN_SHARE_LONG = 0.15   # 서술형: 60자↑ 문장이 이 비율 미만이면 "전부 단문" 경고 (승인 기준 약 1/3)
 COPY_MIN = 25           # 같은 회사 다른 문항과 이 길이 이상 연속 일치하면 중복 경고
 COPY_MIN_SRC = 30       # 포트폴리오 원본과는 이 길이 이상 (서비스명·설명구 수준의 짧은 일치는 정상)
+LABEL_MIN = 20          # 제목·한 줄 요약·키 메시지(라벨성 문구)와는 이 길이 이상이면 경고
 FILL = 0.95             # 글자 수 목표: 제한의 95% 이상
 # 수치 근거: "숫자+단위"가 경험 파일·회사 분석에 없으면 ⚠️ (합산·외부 출처면 근거를 남기고 유지)
 NUM = re.compile(r"(\d+(?:[.,]\d+)*)\s*(%|퍼센트|배|건|명|개사|개|종|곳|팀|위|회|주|개월|년|시간|초|분|만|억|천)")
@@ -107,6 +108,53 @@ def source_corpus(company):
     return clean("\n".join(f.read_text(encoding="utf-8") for f in fs)).replace(",", "")
 
 
+def load_terms():
+    """portfolio/_terms.md → (금지 [(표현, [문맥], 대신)], 내부 용어 [(표현, 대신)]). 템플릿 자리표시 행((예: …))은 건너뛴다."""
+    f = ROOT / "_terms.md"
+    ban, internal = [], []
+    if not f.exists():
+        return ban, internal
+    cur = None
+    for line in f.read_text(encoding="utf-8").split("\n"):
+        if line.startswith("## "):
+            cur = "ban" if "금지" in line else "int" if "내부 용어" in line else None
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")] if line.startswith("|") else []
+        if not cells or cells[0] in ("표현", "") or set(cells[0]) <= set("-: ") or cells[0].startswith("("):
+            continue
+        if cur == "ban":
+            ctx = [x.strip() for x in cells[1].split(",") if x.strip()] if len(cells) > 1 else []
+            ban.append((cells[0], ctx, cells[2] if len(cells) > 2 else ""))
+        elif cur == "int":
+            internal.append((cells[0], cells[1] if len(cells) > 1 else ""))
+    return ban, internal
+
+
+def label_pool():
+    """경험 파일의 제목·한 줄 요약·키 메시지 — 로스터에 매번 보여 라벨째 옮겨지기 쉬운 문구(15자 기준)."""
+    pool = []
+    for f in sorted(ROOT.glob("*/*.md")):
+        if "_templates" in f.parts:
+            continue
+        t = f.read_text(encoding="utf-8")
+        m = re.search(r"^id:\s*(\S+)", t, re.M)
+        ti = re.search(r'^title:\s*"?(.*?)"?\s*$', t, re.M)
+        secs = "".join(x.group(1) for x in re.finditer(r"^## (?:한 줄 요약|키 메시지[^\n]*)\n(.*?)(?=^## |\Z)", t, re.S | re.M))
+        pool.append((m.group(1) if m else f.stem, shingles(clean((ti.group(1) if ti else "") + "\n" + secs), LABEL_MIN)))
+    return pool
+
+
+def other_company_pool(company):
+    """다른 회사 답안 — 회사를 넘어 같은 문장을 반복하면 "다른 회사에도 그대로 들어갈 문장"이다."""
+    pool = []
+    for f in sorted((REPO / "applications").glob("*/answers.md")):
+        if f.parent.name == company:
+            continue
+        for b in answer_blocks(f.parent.name):
+            pool.append((f.parent.name, shingles(clean(b["body"]))))
+    return pool
+
+
 def short(s, n=34):
     return s if len(s) <= n else s[:n] + "…"
 
@@ -123,7 +171,7 @@ def parse_type(s):
     return m.group(1) if m else ("D" if "항목 기입" in s else None)
 
 
-def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=(), pool=None, label="", per_item=False, corpus=None, jd_terms=()):
+def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=(), pool=None, label="", per_item=False, corpus=None, jd_terms=(), terms=((), ()), labels=(), cross=()):
     body = clean(body)
     title, text = split_title(body)
     sents = sentences(body)
@@ -209,6 +257,29 @@ def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=
     if kw:
         miss = [k for k in kw if k not in text]
         (W if miss else OK).append(f"JD 키워드 {len(kw) - len(miss)}/{len(kw)}" + (f" — 없음: {', '.join(miss)}" if miss else ""))
+
+    # 11. 답안 표현 사전 (portfolio/_terms.md) — 🔒 문장 제외
+    ban, internal = terms
+    js = [s for s in sents if not any(s in l or l in s for l in lk)]
+    hit_b = []
+    for w, ctx, alt in ban:
+        for s in js:
+            if w in s and (not ctx or any(c in s for c in ctx)):
+                hit_b.append(f"\"{w}\"" + (f" → {alt[:30]}" if alt else ""))
+                break
+    (E if hit_b else OK).append("금지 표현(_terms.md): " + "; ".join(hit_b) if hit_b else "금지 표현(_terms.md) 없음")
+    hit_i = [f"{w} → {alt}" for w, alt in internal
+             if any(re.search(rf"{re.escape(w)}(?!\s*\()", s) for s in js) and not any(w in k for k in kw)]
+    if hit_i:
+        W.append("내부 용어 — JD에 없으면 풀거나 뺀다: " + "; ".join(hit_i[:4]))
+    # 12. 라벨 복사 / 다른 회사 답안과 같은 문장
+    for pool_, what, k_ in ((labels, "경험 파일의 제목·한 줄 요약·키 메시지와 일치(라벨째 옮김)", LABEL_MIN),
+                            (cross, "다른 회사 답안과 같은 문장", COPY_MIN)):
+        if not pool_:
+            continue
+        h = overlaps(" ".join(js), pool_, k_)
+        if h:
+            W.append(f"{what} {len(h)}곳 — " + "; ".join(f"{nm} \"{short(s, 26)}\"" for k, nm, s in h[:3]))
 
     # 10. 수치 근거 (🔒 문장 제외)
     if corpus is not None:
@@ -312,6 +383,7 @@ def main(argv):
     kw = [k.strip() for k in (opt("--kw") or "").split(",") if k.strip()]
     pool = portfolio_pool()
     corpus = source_corpus(company)
+    terms, labels, cross = load_terms(), label_pool(), other_company_pool(company)
     blocks = answer_blocks(company)
     jd_terms = [k for k in kw if "·" in k]
     sp = REPO / "applications" / company / "session.md"
@@ -330,19 +402,19 @@ def main(argv):
             return 0
         for b in blocks:
             errs += lint(b["body"], b["limit"], b["no_space"], b["qtype"], others=others_of(b["body"]),
-                         kw=kw, pool=pool, label=b["head"][:48], per_item=b["per_item"], corpus=corpus, jd_terms=jd_terms)
+                         kw=kw, pool=pool, label=b["head"][:48], per_item=b["per_item"], corpus=corpus, jd_terms=jd_terms, terms=terms, labels=labels, cross=cross)
         print(f"■ {company} {len(blocks)}문항 — ❌ 합계 {errs}")
     elif opt("--file"):
         body = Path(opt("--file")).read_text(encoding="utf-8")
         errs = lint(body, int(opt("--limit")) if opt("--limit") else None, "--no-space" in args,
-                    opt("--type"), others=others_of(body), kw=kw, pool=pool, label=f"{company} {opt('--file')}", corpus=corpus, jd_terms=jd_terms)
+                    opt("--type"), others=others_of(body), kw=kw, pool=pool, label=f"{company} {opt('--file')}", corpus=corpus, jd_terms=jd_terms, terms=terms, labels=labels, cross=cross)
     else:
         s = from_session(company)
         if not s["body"]:
             print("❌ session.md 「현재 초안」이 비어 있다")
             return 1
         errs = lint(s["body"], s["limit"], s["no_space"], s["qtype"], locked=s["locked"],
-                    others=others_of(s["body"]), kw=kw, pool=pool, label=s["head"], corpus=corpus, jd_terms=jd_terms)
+                    others=others_of(s["body"]), kw=kw, pool=pool, label=s["head"], corpus=corpus, jd_terms=jd_terms, terms=terms, labels=labels, cross=cross)
     return 1 if errs else 0
 
 

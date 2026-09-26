@@ -58,6 +58,25 @@ def body_only_nums(t, frag):
                    if not re.search(rf"(?<![\d.]){re.escape(m.group(1).replace(',', ''))}\s*{re.escape(m.group(2))}", frag)})
 
 
+def load_banned():
+    """portfolio/_terms.md 「금지」 표 → [(표현, [문맥])]."""
+    f = os.path.join(ROOT, '_terms.md')
+    out, cur = [], False
+    if not os.path.exists(f):
+        return out
+    for line in open(f, encoding='utf-8'):
+        if line.startswith('## '):
+            cur = '금지' in line
+            continue
+        c = [x.strip() for x in line.strip().strip('|').split('|')] if cur and line.startswith('|') else []
+        if c and c[0] not in ('표현', '') and not set(c[0]) <= set('-: ') and not c[0].startswith('('):
+            out.append((c[0], [x.strip() for x in c[1].split(',') if x.strip()] if len(c) > 1 else []))
+    return out
+
+
+BANNED = load_banned()
+
+
 def load():
     exps = {}
     for p in sorted(glob.glob('career/*.md') + glob.glob('activities/*.md') + glob.glob('projects/*.md')):
@@ -88,6 +107,7 @@ def load():
             has_star=bool(re.search(r'^## S — 상황', t, re.M)),
             projects=re.findall(r'prj-\d+', g('projects')),
             heads=re.findall(r'^## (.+)$', t, re.M),
+            face=(g('title') + ' ' + ((re.search(r'^## 한 줄 요약\n+(?!#)(.+)$', t, re.M) or [None, ''])[1])),
             body_only_nums=body_only_nums(t, sec.group(1) if sec else ''),
             sec_links=set(re.findall(r'(?:car|act|prj)-\d+', ''.join(
                 m.group(1) for m in re.finditer(r'^## (?:연결|구성|하위 프로젝트)[^\n]*\n(.*?)(?=^## |\Z)', t, re.S | re.M)))),
@@ -162,6 +182,9 @@ for i, v in E.items():
         miss = [h for h in ('개요', '구성', '전체 성과') if not any(x.split(' (')[0] == h for x in v['heads'])]
         if miss:
             err.append(f"[5] {i}: container 섹션 누락 — {', '.join(miss)} (이름 고정: 개요 / 구성 (하위 프로젝트) / 전체 성과)")
+    for w, ctx in BANNED:
+        if w in v['face'] and (not ctx or any(c in v['face'] for c in ctx)):
+            err.append(f"[5-c] {i}: 제목·한 줄 요약에 금지 표현 \"{w}\" — 로스터에 매번 노출돼 답안에 옮겨진다. 사실은 본문(⛔ 표시)에 두고 여기선 뺀다(_terms.md)")
     if v['body_only_nums']:
         warn.append(f"[6-c] {i}: 본문에만 있는 수치 {', '.join(v['body_only_nums'][:5])} — 답안에 쓸 사실이면 증거 조각으로 옮긴다")
     stray = v['sec_links'] - v['links'] - {i}
