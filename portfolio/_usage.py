@@ -4,9 +4,9 @@
 사용:  python3 portfolio/_usage.py <회사명>
 예:    python3 portfolio/_usage.py 회사명
 
-`/answer` 「2. 후보 스캔」의 선행 단계. `--exp prj-08`: 모든 회사 답안에서 그 경험을 쓴 문장만(프레이밍 일관성 확인). `--results`: 회사별 제출·결과·지원 유형·주력 계열(`/retro` 결과 검증). 인라인 스크립트를 쓰지 않는 이유:
+`/answer` 「2. 후보 스캔」의 선행 단계. `--exp prj-NN`: 모든 회사 답안에서 그 경험을 쓴 문장만(프레이밍 일관성 확인). `--results`: 회사별 제출·결과·지원 유형·주력 계열(`/retro` 결과 검증). 인라인 스크립트를 쓰지 않는 이유:
 아카이브 포맷이 회사마다 조금씩 달라(`### 사용 경험 ID` 헤딩 / `**사용 경험 ID**:` 볼드,
-`[car-01](링크)` / `**car-01**` 표기) 정규식 하나로는 조용히 0건을 리턴한다.
+`[car-NN](링크)` / `**car-NN**` 표기) 정규식 하나로는 조용히 0건을 리턴한다.
 편중 경보가 "미사용"으로 오작동하면 편중을 못 잡으므로, 포맷 관용적으로 파싱한다.
 """
 import re
@@ -55,22 +55,32 @@ def load_roster():
 
 
 def parse_blocks(text):
-    """문항 블록으로 자른다 — `## Q.`가 있으면 그걸로, 없으면 모든 `## ` 헤딩으로."""
-    parts = re.split(r"\n## Q\.", text)
-    if len(parts) > 1:
-        return [("## Q." + p).split("\n")[0][:60] and ("## Q." + p) for p in parts[1:]]
-    parts = re.split(r"\n## (?!Q\.)", text)
-    return ["## " + p for p in parts[1:]]
+    """문항 블록으로 자른다 — `## Q.`·`## Q1.`·`## Q3-3.` 헤딩이 있으면 그것만, 없으면 모든 `## ` 헤딩으로.
+
+    `#`·`##` 헤딩마다 끊으므로 문항 뒤의 회고·점검 메모는 문항에 붙지 않는다.
+    「검사용 최종본」 사본은 원문 문항과 같은 문항이라 세지 않는다(이중 집계 방지)."""
+    parts = re.split(r"\n(?=#{1,2} )", "\n" + text)
+    heads = [p for p in parts if p.startswith("## ") and "검사용 최종본" not in p.split("\n")[0]]
+    qs = [p for p in heads if re.match(r"## Q[\d-]*\.", p)]
+    return qs or [p for p in heads if not re.match(r"## (면접 주의|지원 공통)", p)]
 
 
 def qtype_of(block):
     """문항 유형(A/B/C/D)을 읽는다. D형(항목 기입 = 이력 필드)은 편중 판정 대상이 아니다.
 
     경력사항·수상경력·프로젝트 같은 이력 필드는 '그 경험을 쓸 수밖에 없는 칸'이라,
-    편중 분모에 넣으면 car-01 계열 경보가 상시 울려 진짜 편중과 구별되지 않는다.
+    편중 분모에 넣으면 경력 계열 경보가 상시 울려 진짜 편중과 구별되지 않는다.
     유형이 안 적힌 옛 아카이브는 보수적으로 서술형으로 세고 그 사실을 경고한다."""
     m = re.search(r"\*\*문항\s*유형\*\*\s*:?\s*\**\s*([ABCD])", block)
-    return m.group(1) if m else None
+    if m:
+        return m.group(1)
+    head = block.split("\n")[0]          # 헤딩에 적힌 유형: "(800자, A+C형)" · "(500자, D형)" · "항목 기입형" · "서술형"
+    m = re.search(r"([ABCD])(?:\+[ABCD])*형", head)
+    if m:
+        return m.group(1)
+    if re.search(r"항목\s*기입형|이력 필드", head):
+        return "D"
+    return "A" if "서술형" in head else None
 
 
 def ids_in_block(block):
@@ -85,26 +95,27 @@ def ids_in_block(block):
     return set(re.findall(ID, body)), True
 
 
-def total_usage():
-    """전 회사 답안에서 경험별 사용 횟수(로스터 표시용)."""
+def total_usage(narr_only=False):
+    """전 회사 답안에서 경험별 사용 횟수(로스터 표시용). narr_only면 D형(이력 필드)을 뺀다."""
     c = Counter()
     for f in (REPO / "applications").glob("*/answers.md"):
         for b in parse_blocks(f.read_text(encoding="utf-8")):
-            c.update(ids_in_block(b)[0])
+            if not (narr_only and qtype_of(b) == "D"):
+                c.update(ids_in_block(b)[0])
     return c
 
 
 def print_roster(roster, per_id, parent_of):
     """후보 스캔용 전체 로스터 — INDEX.md 전체를 읽지 않아도 되게 한 줄씩(frontmatter 기준이라 항상 최신).
     ⭐ 보강 1순위 = 전체 5회↑ 쓰였는데 정량 △ / 💤 미활용 강한 재료 = 정량 ✅인데 전체 1회 이하."""
-    tot = total_usage()
-    print(f"\n[로스터] {len(roster)}건 — ID 유형(e/c) 재료/정량 · 이 회사 사용 · 제목 — 한 줄 요약 · 태그  (⭐ 정량 보강 1순위 · 💤 미활용 강한 재료)")
+    tot, narr = total_usage(), total_usage(narr_only=True)
+    print(f"\n[로스터] {len(roster)}건 — ID 유형(e/c) 재료/정량 · 이 회사 사용 · 전 회사 서술형(3↑이면 대안 먼저) · 제목 — 한 줄 요약 · 태그  (⭐ 정량 보강 1순위 · 💤 미활용 강한 재료)")
     for i in sorted(roster, key=lambda x: (x[:3] != "car", x[:3] != "act", x)):
         m = META.get(i, {})
         up = f" ↑{parent_of[i]}" if i in parent_of else ""
         used = f"{per_id[i]}회" if per_id.get(i) else "·"
         flag = "⭐" if tot[i] >= 5 and m.get("quant") == "△" else "💤" if m.get("quant") == "✅" and tot[i] <= 1 else "  "
-        print(f"  {flag}{i} {m.get('type','?')} {m.get('ready','?')}/{m.get('quant','?')} {used:>3}{up}  {roster[i]} — {m.get('summary','')} · {m.get('tags','')}")
+        print(f"  {flag}{i} {m.get('type','?')} {m.get('ready','?')}/{m.get('quant','?')} {used:>3} 전체{narr[i]}{up}  {roster[i]} — {m.get('summary','')} · {m.get('tags','')}")
 
 
 def main(company):
@@ -118,7 +129,7 @@ def main(company):
 
     blocks = parse_blocks(text)
     per_id, per_line, missing = Counter(), Counter(), []
-    narr_line, n_narr, n_field, n_untyped = Counter(), 0, 0, 0
+    narr_line, narr_id, n_narr, n_field, n_untyped = Counter(), Counter(), 0, 0, 0
     for b in blocks:
         title = b.split("\n")[0].lstrip("# ").strip()[:52]
         ids, found = ids_in_block(b)
@@ -134,6 +145,7 @@ def main(company):
             n_narr += 1
             n_untyped += (t is None)
             narr_line.update(lines)
+            narr_id.update(i for i in ids if META.get(i, {}).get("type") != "c")
 
     print(f"■ {company} — 문항 {len(blocks)}건 (서술형 {n_narr} · 이력 필드(D) {n_field})")
     if n_untyped:
@@ -154,9 +166,12 @@ def main(company):
     if narr_line:
         top, n = narr_line.most_common(1)[0]
         print(f"[서술형만] {narr_line.most_common()}   ← 편중 판정은 이 줄로 한다")
-        if n_narr >= 3 and n / n_narr >= 0.5:
+        if n_narr >= 2 and n >= 2 and n / n_narr >= 0.5:
             print(f"🚨 계열 편중: 서술형 {n_narr}문항 중 {n}문항이 '{top}' 계열 "
                   f"— 정당한 편중(그 경험이 유일·압도적 적합)인지 관성인지 판정할 것")
+    rep = [f"{k}({v}문항)" for k, v in narr_id.most_common() if v > 1]
+    if rep:
+        print(f"🚨 같은 프로젝트가 서술형 여러 문항에: {', '.join(rep)} — 문항마다 무게중심(S·T/A/R)이 다른지, 대안이 없는지 판정할 것")
     if n_field:
         print(f"(이력 필드 {n_field}건은 편중 분모에서 제외 — 경력·수상·프로젝트 칸은 "
               f"쓸 경험이 정해져 있어 편중 판정 대상이 아니다)")

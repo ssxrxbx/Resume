@@ -259,6 +259,9 @@ for pth, cap in DOC_BUDGET.items():
     sizes.append(f"{name} {n:,}/{cap:,}")
     if n > cap:
         err.append(f"[10] {pth} {n:,}자 > 예산 {cap:,}자 — 합치거나 대체해 줄이고, 불가능하면 사용자에게 증액 제안")
+    ids = sorted(set(re.findall(r'\b(?:car|act|prj)-\d{2}\b', open(fp, encoding='utf-8').read())))
+    if ids:
+        err.append(f"[10-b] {pth}에 경험 ID {', '.join(ids)} — 규칙은 경험을 지정하지 않는다. 예시는 prj-XX 같은 자리표시자로(원칙 10)")
 print("[10] 규칙 분량 " + " · ".join(sizes))
 for src, dst in MIRRORS:
     d = os.path.join(REPO, dst)
