@@ -195,7 +195,8 @@ def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=
     kind = "D" if qtype == "D" else "narr"
     goal, cap, hard = LEN[kind]
     full = re.sub(r"\n\s*\n+", "\n", body).strip()
-    n_sp, n_ns, n_nl = len(full.replace("\n", "")), len(re.sub(r"\s", "", full)), len(full)
+    pasted = re.sub(r"\n[ \t]*\n+", "\n\n", body).strip()  # 입력란에 붙인 그대로: 빈 줄 = 줄바꿈 2자
+    n_sp, n_ns, n_nl = len(full.replace("\n", "")), len(re.sub(r"\s", "", full)), len(pasted)
     E, W, OK = [], [], []
 
     # 1. 글자 수
@@ -208,7 +209,7 @@ def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=
         if n > limit:
             E.append(msg + f" — {n - limit}자 초과")
         elif not no_space and n_nl > limit:
-            W.append(msg + f" — 줄바꿈까지 세는 사이트면 {n_nl}자로 초과. 입력란 기준 확인")
+            W.append(msg + f" — 줄바꿈까지 세는 사이트(빈 줄=2자)면 {n_nl}자로 {n_nl - limit}자 초과. 입력란 기준 확인")
         else:
             (W if pct < FILL else OK).append(msg + (f" — 95%까지 {int(limit * FILL) - n}자 부족" if pct < FILL else ""))
     # 2. 소제목
@@ -373,6 +374,12 @@ def from_session(company):
                 limit=limit, no_space=ns, qtype=parse_type(qline), locked=locked)
 
 
+def kw_items(line):
+    """JD 키워드 줄 → 목록. `백틱` 항목이 있으면 그대로(표기 안의 쉼표 보존), 없으면 쉼표로 나눈다."""
+    tick = [k.strip() for k in re.findall(r"`([^`]+)`", line) if k.strip()]
+    return tick or [k.strip(" `*") for k in re.split(r"[,，、]", line) if k.strip(" `*")]
+
+
 def coverage(company, blocks, kw):
     """JD 키워드가 지원서 전체(저장 답안 + 현재 초안)의 어느 문항에 들어 있는지. 빈 축을 찾는다."""
     sp = REPO / "applications" / company / "session.md"
@@ -380,8 +387,8 @@ def coverage(company, blocks, kw):
     if sp.exists():
         st = sp.read_text(encoding="utf-8")
         if not kw:
-            m = re.search(r"^-\s*JD 키워드[^:]*:\s*(.+)$", st, re.M)
-            kw = [k.strip(" `*") for k in re.split(r"[,，、]", m.group(1)) if k.strip(" `*")] if m else []
+            m = re.search(r"^-\s*\**\s*JD 키워드[^:]*:\**\s*(.+)$", st, re.M)
+            kw = kw_items(m.group(1)) if m else []
         try:
             draft = from_session(company)["body"]
         except SystemExit:
@@ -393,12 +400,17 @@ def coverage(company, blocks, kw):
     if draft:
         docs.append(("현재 초안", clean(draft)))
     print(f"■ {company} JD 키워드 커버리지 — 문항 {len(docs)}개")
-    empty = []
+    josa = re.compile(r"(으로|에서|에게|까지|부터|과|와|을|를|이|가|은|는|의|로|에|및|해|하여|했|한|하는)$")
+    stems = lambda k: [josa.sub("", t) for t in re.findall(r"[\w가-힣]+", k) if len(josa.sub("", t)) >= 2 and t != "및"]
+    empty, part = [], []
     for k in kw:
         where = [n for n, d in docs if k in d]
-        empty += [] if where else [k]
-        print(f"  {'✅' if where else '⚠️ '} {k:16s} {', '.join(where) if where else '어느 문항에도 없음'}")
-    print(f"→ 빈 축 {len(empty)}/{len(kw)}" + (f": {', '.join(empty)} — 남은 문항에 배정하거나 이유를 남긴다" if empty else ""))
+        near = [] if where else [n for n, d in docs if stems(k) and all(t in d for t in stems(k))]
+        empty += [] if where or near else [k]
+        part += near and [k] or []
+        mark, loc = ("✅", ", ".join(where)) if where else ("△ ", ", ".join(near) + " (조사·어순 변형 — 표기 그대로 심을지 판단)") if near else ("⚠️ ", "어느 문항에도 없음")
+        print(f"  {mark} {k:16s} {loc}")
+    print(f"→ 빈 축 {len(empty)}/{len(kw)} · 변형 일치 {len(part)}" + (f": {', '.join(empty)} — 남은 문항에 배정하거나 이유를 남긴다" if empty else ""))
     return 0
 
 
@@ -416,9 +428,9 @@ def main(argv):
     jd_terms = [k for k in kw if "·" in k]
     sp = REPO / "applications" / company / "session.md"
     if sp.exists():
-        m = re.search(r"^-\s*JD 키워드[^:]*:\s*(.+)$", sp.read_text(encoding="utf-8"), re.M)
+        m = re.search(r"^-\s*\**\s*JD 키워드[^:]*:\**\s*(.+)$", sp.read_text(encoding="utf-8"), re.M)
         if m:
-            jd_terms += [k.strip(" `*") for k in re.split(r"[,，、]", m.group(1)) if "·" in k]
+            jd_terms += [k for k in kw_items(m.group(1)) if "·" in k]
     if "--coverage" in args:
         return coverage(company, blocks, kw)
     others_of = lambda body: [(b["head"][:20], shingles(clean(b["body"]))) for b in blocks
