@@ -13,6 +13,7 @@
 규칙 원문은 `/answer` SKILL.md 「문체」·「기계 검사」. 규칙을 바꾸면 여기 목록도 함께 고친다.
 """
 import re
+from collections import Counter
 import sys
 from pathlib import Path
 
@@ -184,6 +185,8 @@ def parse_limit(s):
 
 
 def parse_type(s):
+    if "제안형" in s or re.search(r"\bE\s*형", s):   # E 제안형 — "A~D 밖" 같은 설명 속 글자를 유형으로 읽지 않게 먼저 본다
+        return "E"
     m = re.search(r"\b([ABCD])(?:\+[ABCD])?\s*(?:형|\(|$|\s|—)", s) or re.search(r"([ABCD])형", s)
     return m.group(1) if m else ("D" if "항목 기입" in s else None)
 
@@ -249,6 +252,12 @@ def lint(body, limit=None, no_space=False, qtype=None, locked=(), others=(), kw=
     br = [f"\"{w}\"" for w in BRIDGES if w in text]
     if br:
         W.append(f"도식적 브릿지 {', '.join(br)} — 내용으로 잇는 편이 낫다(승인 문장이면 유지)")
+    if kind == "narr":                      # 같은 종결 서술어 반복("판단했습니다" ×2) — 규칙 문장 대신 기계로 센다
+        stems = Counter(re.sub(r"(?:했|였|었|았|겠)?(?:습니다|입니다|합니다|니다)$", "", re.sub(r"[^\w]+$", "", s.split()[-1]))
+                        for s in sents if s.split())
+        rep = [f"\"{k}\" {c}회" for k, c in stems.items() if c >= 2 and len(k) >= 2 and k != "생각"]  # "~라고 생각합니다"는 허용 종결
+        if rep:
+            W.append(f"같은 종결 서술어 반복 {', '.join(rep)} — 한 번은 다른 동사로")
     # 5. 확인 필요
     for i, s in enumerate(sents):
         if "그 결과" in s:
@@ -336,7 +345,8 @@ def answer_blocks(company):
             continue
         tm = re.search(r"\*\*문항\s*유형\*\*\s*:?\s*([^\n]*)", blk)
         limit, ns = parse_limit(head)
-        per_item = bool(re.search(r"(각|별|항목당)\s*(?:상세설명\s*)?(?:최대\s*)?\d[\d,]*\s*자", head))
+        per_item = bool(re.search(r"(각|별|당)\s*(?:상세설명\s*)?(?:최대\s*)?\d[\d,]*\s*자", head)
+                        or re.search(r"최대\s*\d+\s*(?:개|과목|건)", head))   # 과목당 30자 · 최대 5개 × 200자
         out.append(dict(head=head.strip(), body=m.group(1), limit=limit, no_space=ns, per_item=per_item,
                         qtype=parse_type(tm.group(1)) if tm else parse_type(head)))
     return out

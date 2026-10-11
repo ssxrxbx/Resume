@@ -32,6 +32,7 @@ SWIFT_SRC = ROOT / "_extract.swift"
 MIN_TEXT = 20                            # 이보다 짧으면 텍스트 층이 없는 페이지로 본다
 IMG_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".heic", ".tif", ".tiff", ".bmp"}
 MISSING = "(미추출 — 하위 에이전트 전사 필요)"
+TALL, SLICE, OVERLAP = 3, 1500, 100      # 세로/가로 비율이 TALL을 넘는 이미지는 SLICE px 조각(OVERLAP 겹침)으로 OCR
 
 
 # ── 백엔드 1: macOS ─────────────────────────────────────────
@@ -121,6 +122,64 @@ def portable_backend(src):
 def page_count_guess(src):
     data = Path(src).read_bytes()
     return max(1, len(re.findall(rb"/Type\s*/Page[^s]", data)))
+
+
+# ── 긴 이미지 분할 (채용 공고 한 장짜리 세로 이미지는 통째로 OCR하면 거의 못 읽는다) ──
+def img_size(src):
+    if shutil.which("sips"):
+        r = subprocess.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", str(src)], capture_output=True, text=True)
+        d = dict(re.findall(r"(pixelWidth|pixelHeight): (\d+)", r.stdout))
+        if len(d) == 2:
+            return int(d["pixelWidth"]), int(d["pixelHeight"])
+    try:
+        from PIL import Image
+        return Image.open(src).size
+    except Exception:
+        return None, None
+
+
+def crop(src, out, y, h, w):
+    if shutil.which("sips"):
+        subprocess.run(["sips", "-s", "format", "png", "-c", str(h), str(w), "--cropOffset", str(y), "0",
+                        str(src), "--out", str(out)], capture_output=True)
+        return out.exists()
+    try:
+        from PIL import Image
+        Image.open(src).crop((0, y, w, y + h)).save(out)
+        return True
+    except Exception:
+        return False
+
+
+def split_tall(src, tmp):
+    """비율이 TALL을 넘는 이미지 → 위에서부터 조각 파일 목록. 해당 없거나 실패하면 None."""
+    if src.suffix.lower() not in IMG_EXT:
+        return None
+    w, h = img_size(src)
+    if not w or h / w <= TALL:
+        return None
+    out, y = [], 0
+    while True:
+        hh = min(SLICE, h - y)
+        f = Path(tmp) / f"s{len(out) + 1:03}.png"
+        if not crop(src, f, y, hh, w):
+            return None
+        out.append(f)
+        if y + hh >= h:
+            return out
+        y += SLICE - OVERLAP
+
+
+def extract(src):
+    with tempfile.TemporaryDirectory() as tmp:
+        parts = split_tall(src, tmp)
+        if not parts:
+            return mac_backend(src) or portable_backend(src)
+        pages, how = [], ""
+        for k, f in enumerate(parts, 1):
+            pg, how = mac_backend(f) or portable_backend(f)
+            pages.append((k, pg[0][1], pg[0][2]))
+        return pages, f"{how} · 긴 이미지 {len(parts)}조각 분할(조각 = 쪽)"
 
 
 # ── 저장·출력 ────────────────────────────────────────────────
@@ -213,8 +272,7 @@ def main(argv):
     if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime and "--refresh" not in args:
         pages = read_md(dst)                               # 이미 추출됨 → 재사용
     else:
-        res = mac_backend(src) or portable_backend(src)
-        pages, how = res
+        pages, how = extract(src)
         write_md(dst, src, pages, how)
         pages = read_md(dst)
         print(f"· 추출 방식: {how}", file=sys.stderr)

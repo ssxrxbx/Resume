@@ -71,13 +71,13 @@ def qtype_of(block):
     경력사항·수상경력·프로젝트 같은 이력 필드는 '그 경험을 쓸 수밖에 없는 칸'이라,
     편중 분모에 넣으면 경력 계열 경보가 상시 울려 진짜 편중과 구별되지 않는다.
     유형이 안 적힌 옛 아카이브는 보수적으로 서술형으로 세고 그 사실을 경고한다."""
-    m = re.search(r"\*\*문항\s*유형\*\*\s*:?\s*\**\s*([ABCD])", block)
+    m = re.search(r"\*\*문항\s*유형\*\*\s*:?\s*\**\s*([ABCDE]|제안형)", block)
     if m:
-        return m.group(1)
+        return "E" if m.group(1) == "제안형" else m.group(1)
     head = block.split("\n")[0]          # 헤딩에 적힌 유형: "(800자, A+C형)" · "(500자, D형)" · "항목 기입형" · "서술형"
-    m = re.search(r"([ABCD])(?:\+[ABCD])*형", head)
+    m = re.search(r"([ABCDE])(?:\+[ABCDE])*형", head) or re.search(r"(제안)형", head)
     if m:
-        return m.group(1)
+        return "E" if m.group(1) == "제안" else m.group(1)
     if re.search(r"항목\s*기입형|이력 필드", head):
         return "D"
     return "A" if "서술형" in head else None
@@ -141,7 +141,7 @@ def main(company):
         t = qtype_of(b)
         if t == "D":
             n_field += 1
-        else:                        # A·B·C + 유형 미기재(보수적으로 서술형 취급)
+        else:                        # A·B·C·E + 유형 미기재(보수적으로 서술형 취급)
             n_narr += 1
             n_untyped += (t is None)
             narr_line.update(lines)
@@ -239,9 +239,10 @@ def results():
     res = [r[2] for r in rows]
     passed = sum("합격" in x and "불합격" not in x for x in res)
     failed = sum("불합격" in x for x in res)
-    print(f"\n결과 기록: 합격 {passed} · 불합격 {failed} · 미기록 {len(rows) - passed - failed}"
+    quit_ = sum("포기" in x for x in res)   # 스스로 중단한 지원은 합격·불합격 비교에서 뺀다
+    print(f"\n결과 기록: 합격 {passed} · 불합격 {failed} · 포기 {quit_} · 미기록 {len(rows) - passed - failed - quit_}"
           + ("  ← 합격·불합격이 모두 있어 비교할 수 있다" if passed and failed else
-             "  ← 결과가 나오면 answers.md 첫머리에 `> 결과: 서류 합격|서류 불합격|대기`"))
+             "  ← 결과가 나오면 answers.md 첫머리에 `> 결과: 서류 합격|서류 불합격|대기|중도 포기`"))
     return 0
 
 
